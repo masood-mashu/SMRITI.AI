@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from uuid import UUID
 from pathlib import Path
 from typing import Literal
@@ -7,7 +8,7 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
-from .db import init_db, session_scope
+from .db import check_database, init_db, session_scope
 from .extractor import ExtractionError, ProviderConfigurationError
 from .generation import GenerationError
 from .graph import (
@@ -21,8 +22,16 @@ from .models import HealthFact
 from .storage import StorageError, get_storage
 from .observability import audit_log, trace_span
 from .security import require_security
+from .mcp_server import router as mcp_router
 
-app = FastAPI(title="Smriti API", version="0.1.0")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Smriti API", version="0.1.0", lifespan=lifespan)
+app.include_router(mcp_router)
 DEFAULT_PATIENT_ID = UUID("00000000-0000-0000-0000-000000000001")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = {"application/pdf", "image/png", "image/jpeg", "text/plain"}
@@ -52,7 +61,14 @@ async def request_observability(request: Request, call_next):
     return response
 
 
-def resolve_patient_id(patient_id: UUID | None) -> str:
+def resolve_patient_id(patient_id: UUID | None, request: Request | None = None) -> str:
+    auth = getattr(request.state, "auth", None) if request is not None else None
+    if auth is not None and auth.mode == "oidc":
+        if not auth.patient_id:
+            raise HTTPException(status_code=403, detail="Token is not associated with a patient")
+        if patient_id is not None and str(patient_id) != auth.patient_id:
+            raise HTTPException(status_code=403, detail="Patient access denied")
+        return auth.patient_id
     return str(patient_id or DEFAULT_PATIENT_ID)
 
 
@@ -83,18 +99,28 @@ def serialize_fact(fact: HealthFact) -> dict:
     }
 
 
-@app.on_event("startup")
-def startup() -> None:
-    init_db()
-
-
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/health/live")
+def liveness() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def readiness() -> dict[str, str]:
+    try:
+        check_database()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Database unavailable") from exc
+    return {"status": "ready"}
+
+
 @app.post("/reports", dependencies=[Depends(require_security)])
 async def upload_report(
+    request: Request,
     file: UploadFile = File(...),
     patient_id: UUID | None = None,
     source_type: Literal["lab_result", "discharge_summary", "prescription", "other"] = "other",
@@ -116,7 +142,7 @@ async def upload_report(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     try:
         result = smriti_ingestion_graph.invoke({
-            "patient_id": resolve_patient_id(patient_id),
+            "patient_id": resolve_patient_id(patient_id, request),
             "filename": file.filename or "upload",
             "content_type": file.content_type or "application/octet-stream",
             "source_type": source_type,
@@ -133,8 +159,8 @@ async def upload_report(
 
 
 @app.get("/timeline", dependencies=[Depends(require_security)])
-def get_timeline(patient_id: UUID | None = None) -> dict:
-    resolved_id = UUID(resolve_patient_id(patient_id))
+def get_timeline(request: Request, patient_id: UUID | None = None) -> dict:
+    resolved_id = UUID(resolve_patient_id(patient_id, request))
     with session_scope() as session:
         facts = get_fact_timeline(session, resolved_id)
         contradictions = get_patient_contradictions(session, resolved_id)
@@ -156,21 +182,21 @@ def get_timeline(patient_id: UUID | None = None) -> dict:
 
 
 @app.post("/brief", dependencies=[Depends(require_security)])
-def generate_doctor_brief(patient_id: UUID | None = None) -> dict:
-    result = doctor_brief_graph.invoke({"patient_id": resolve_patient_id(patient_id)})
+def generate_doctor_brief(request: Request, patient_id: UUID | None = None) -> dict:
+    result = doctor_brief_graph.invoke({"patient_id": resolve_patient_id(patient_id, request)})
     return {"status": "generated", "graph": result}
 
 
 @app.post("/emergency", dependencies=[Depends(require_security)])
-def generate_emergency_card(patient_id: UUID | None = None) -> dict:
-    result = emergency_graph.invoke({"patient_id": resolve_patient_id(patient_id)})
+def generate_emergency_card(request: Request, patient_id: UUID | None = None) -> dict:
+    result = emergency_graph.invoke({"patient_id": resolve_patient_id(patient_id, request)})
     return {"status": "generated", "graph": result}
 
 
 @app.post("/translate", dependencies=[Depends(require_security)])
-def translate_output(patient_id: UUID | None = None, language: str = "en") -> dict:
+def translate_output(request: Request, patient_id: UUID | None = None, language: str = "en") -> dict:
     result = language_graph.invoke({
-        "patient_id": resolve_patient_id(patient_id),
+        "patient_id": resolve_patient_id(patient_id, request),
         "target_language": language,
     })
     return {"status": "generated", "language": language, "graph": result}

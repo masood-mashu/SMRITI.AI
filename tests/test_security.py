@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
-from backend.app.security import rate_limiter
+from backend.app.security import AuthContext, rate_limiter
 
 
 def test_protected_routes_require_bearer_when_enabled(monkeypatch) -> None:
@@ -23,3 +23,32 @@ def test_rate_limit_is_enforced_per_client(monkeypatch) -> None:
     with TestClient(app) as client:
         assert client.get("/timeline").status_code == 200
         assert client.get("/timeline").status_code == 429
+
+
+def test_oidc_context_is_restricted_to_claimed_patient(monkeypatch) -> None:
+    patient_id = "11111111-1111-1111-1111-111111111111"
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    monkeypatch.setenv("AUTH_MODE", "oidc")
+    monkeypatch.setenv("OIDC_ISSUER", "https://issuer.example")
+    monkeypatch.setenv("OIDC_AUDIENCE", "smriti-api")
+    monkeypatch.setenv("RATE_LIMIT_BACKEND", "memory")
+    monkeypatch.setattr(
+        "backend.app.security._oidc_context",
+        lambda token, settings: AuthContext(subject="user-1", patient_id=patient_id, mode="oidc"),
+    )
+    with TestClient(app) as client:
+        headers = {"Authorization": "Bearer signed-token"}
+        assert client.get(f"/timeline?patient_id={patient_id}", headers=headers).status_code == 200
+        assert client.get(
+            "/timeline?patient_id=22222222-2222-2222-2222-222222222222",
+            headers=headers,
+        ).status_code == 403
+
+
+def test_production_redis_limiter_requires_configuration(monkeypatch) -> None:
+    monkeypatch.setenv("SMRITI_ENV", "production")
+    monkeypatch.setenv("AUTH_ENABLED", "false")
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.delenv("RATE_LIMIT_BACKEND", raising=False)
+    with TestClient(app) as client:
+        assert client.get("/timeline").status_code == 503

@@ -6,6 +6,7 @@ import streamlit as st
 
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+API_TOKEN = os.getenv("SMRITI_API_TOKEN")
 SOURCE_TYPES = {
     "Other": "other",
     "Lab result": "lab_result",
@@ -19,7 +20,10 @@ def api_params() -> dict[str, str]:
 
 
 def request_json(method: str, path: str, **kwargs) -> dict:
-    response = requests.request(method, f"{API_URL}{path}", timeout=60, **kwargs)
+    headers = dict(kwargs.pop("headers", {}))
+    if API_TOKEN:
+        headers["Authorization"] = f"Bearer {API_TOKEN}"
+    response = requests.request(method, f"{API_URL}{path}", headers=headers, timeout=60, **kwargs)
     if not response.ok:
         raise RuntimeError(f"Backend error ({response.status_code}): {response.text}")
     return response.json()

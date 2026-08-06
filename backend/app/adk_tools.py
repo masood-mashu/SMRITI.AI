@@ -1,13 +1,26 @@
-"""Google ADK-compatible tool functions for health-memory context.
-
-These plain functions are intentionally framework-neutral so they can be
-registered with ADK when the ADK runtime is added to the deployment.
-"""
+"""Google ADK-compatible health-memory tools and registration helper."""
 
 from uuid import UUID
 
 from .db import session_scope
 from .repositories import get_current_facts, get_emergency_facts, get_patient_contradictions
+
+
+def get_adk_tools() -> list[object]:
+    """Return ADK FunctionTool wrappers when the optional ADK extra is installed.
+
+    ADK accepts plain Python functions; FunctionTool makes the integration
+    explicit for applications that build agents programmatically.
+    """
+    try:
+        from google.adk.tools import FunctionTool
+    except ImportError as exc:
+        raise RuntimeError("Install the 'adk' extra to register Google ADK tools") from exc
+    return [
+        FunctionTool(get_current_health_facts),
+        FunctionTool(get_emergency_health_facts),
+        FunctionTool(get_health_contradictions),
+    ]
 
 
 def get_current_health_facts(patient_id: str) -> list[dict]:

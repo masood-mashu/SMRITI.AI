@@ -5,6 +5,8 @@ import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
 from backend.app.integrations import (
+    BigQueryAuditSink,
+    AIStudioPromptRegistry,
     IntegrationNotConfigured,
     LocalPromptRegistry,
     MCPContextGateway,
@@ -53,3 +55,33 @@ def test_unknown_mcp_tool_is_rejected() -> None:
         with pytest.raises(IntegrationNotConfigured):
             MCPContextGateway(session).call_tool("unknown", {"patient_id": str(uuid4())})
 
+
+def test_bigquery_sink_writes_anonymized_event_with_injected_client() -> None:
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def insert_rows_json(self, table, rows):
+            self.calls.append((table, rows))
+            return []
+
+    client = FakeClient()
+    sink = BigQueryAuditSink("project", "dataset", "events", client=client)
+    sink.write("http_request", {"status_code": 200, "patient_id": "not-included-by-callers"})
+    table, rows = client.calls[0]
+    assert table == "project.dataset.events"
+    assert rows[0]["event"] == "http_request"
+    assert rows[0]["status_code"] == 200
+
+
+def test_ai_studio_prompt_registry_reads_configured_prompt(monkeypatch) -> None:
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"prompt": "configured prompt {context}"}
+
+    monkeypatch.setattr("backend.app.integrations.requests.get", lambda *args, **kwargs: FakeResponse())
+    registry = AIStudioPromptRegistry("https://prompts.example", "test-key")
+    assert registry.get("doctor_brief") == "configured prompt {context}"

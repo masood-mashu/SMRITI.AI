@@ -1,6 +1,14 @@
 # Database migrations
 
-`001_initial_schema.sql` is the baseline migration for a new Postgres database.
-Apply it with `psql` or your Cloud SQL migration runner. Set `DB_AUTO_CREATE=false`
-for deployed environments so application startup does not create tables implicitly.
+Production uses Alembic. Apply the baseline PostgreSQL migration with:
 
+```bash
+alembic upgrade head
+```
+
+The migration creates the append-only schema from `infra/schema.sql`, including
+the `superseded_by` self-reference and partial current-facts index. Set
+`DB_AUTO_CREATE=false` for deployed environments.
+
+SQLite remains available for local development with automatic table creation;
+it is not a production database target.

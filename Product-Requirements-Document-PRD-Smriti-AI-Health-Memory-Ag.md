@@ -1,124 +1,194 @@
-# Product Requirements Document (PRD): Smriti — AI Health Memory Agent
+# Product Requirements Document: Smriti AI Health Memory
 
-## 1. Executive Summary
-**Smriti** is a personal AI Health Memory Agent designed for the AI Agent Builder Series 2026 Grand Finale. Its core promise is to ensure patients "never repeat their medical history again." Unlike standard document summarizers or chatbots, Smriti acts as a patient-owned "AI Operating System for Health," building a structured, longitudinal, and cumulative memory from uploaded medical reports (photos, PDFs, scans). It uses a multi-agent architecture to generate clinician-ready briefs, emergency profiles, and plain-language explanations in regional languages.
+## 1. Product summary
 
-## 2. Problem Statement
-Patients face a fragmented healthcare experience where they must repeatedly explain their medical history, allergies, and medications to different providers. Existing digital health tools are often siloed, document-centric rather than data-centric, or provide generic chat interfaces that do not maintain a growing, structured "memory" of a patient's health over time.
+Smriti is a patient-owned health memory application. It converts uploaded
+medical reports into a structured, longitudinal memory, preserves changes over
+time, highlights contradictions, and produces on-demand summaries for patients
+and clinicians.
 
-## 3. Goals & Objectives
-*   **Cumulative Memory:** Build a system that merges new medical data into a persistent, longitudinal profile rather than just storing files.
-*   **Clinician Utility:** Generate concise, accurate summaries that flag contradictions or trends for doctors.
-*   **Accessibility:** Provide instant, plain-language explanations and translations into regional Indian languages (Hindi, Kannada).
-*   **Emergency Readiness:** Surface critical, life-saving information (allergies, chronic conditions) in a single tap.
-*   **Patient Ownership:** Maintain a system that is fed and controlled by the patient, independent of hospital EHR integrations.
+Smriti is not a diagnostic, treatment, or emergency dispatch system.
 
-## 4. Target Users / Stakeholders
-*   **Primary Users:** Patients and caregivers managing chronic conditions, multiple specialists, or elderly family members.
-*   **Secondary Users (Consumers of Output):** 
-    *   **Doctors:** Receiving clinical briefs to save time during consultations.
-    *   **Emergency Responders:** Accessing critical health data in urgent scenarios.
+## 2. Problem and users
 
-## 5. Functional Requirements
+Patients and caregivers often carry fragmented reports across hospitals and
+specialists. Important allergies, medications, conditions, and lab history can
+be missed or repeatedly reconstructed.
 
-### 5.1. Report Ingestion & Understanding
-*   **Multimodal Extraction:** Support for photos, PDFs, and scans of medical reports.
-*   **Native Multimodal OCR:** Use Gemini 3.1 Pro’s native vision capabilities to extract structured facts (conditions, medications, allergies, lab values, dates) without external OCR libraries.
-*   **Live Streaming Explanation:** As a report is processed, the system must stream a plain-language explanation of the findings back to the UI immediately.
+Primary users are patients and caregivers. Secondary consumers are doctors and
+emergency responders receiving patient-authorized summaries.
 
-### 5.2. Health Memory Management
-*   **Longitudinal Merging:** New extractions must be merged into the existing profile using an append-only, historied pattern (no overwriting).
-*   **Living Health Graph:** Maintain relationships between conditions, medications, and lab results over time.
-*   **Timeline View:** Display a chronological history of health events and data points.
+## 3. Product goals
 
-### 5.3. Specialized Agent Outputs
-*   **Doctor Brief:** Generate a clinical summary and proactively flag contradictions (e.g., a medication discontinued in one report but appearing in another).
-*   **Emergency Card:** Generate a high-speed, structured card containing critical info (allergies, blood type, emergency contacts).
-*   **Language Translation:** Translate any output into plain language and regional languages (starting with Hindi and Kannada).
+1. Build cumulative, patient-owned health memory.
+2. Preserve history instead of overwriting prior facts.
+3. Make contradictions visible for human review.
+4. Provide concise Doctor Brief and Emergency outputs.
+5. Explain recorded information in plain language and selected regional
+   languages.
+6. Protect patient isolation, privacy, and auditability.
 
-### 5.4. User Interface
-*   **Streamlit-based UI:** A clean interface for file uploads, timeline visualization, and viewing agent outputs.
-*   **Streaming Responses:** All agent outputs (Explanation, Brief, Card, Translation) must stream live to the UI to enhance demo responsiveness.
+## 4. Current product behavior
 
-## 6. Non-Functional Requirements
-*   **Performance:** Low-latency streaming for the "Explanation" beat to ensure a smooth live demo.
-*   **Accuracy:** High-precision extraction of medical facts using Gemini 3.1 Pro.
-*   **Scalability:** Application must be containerized and auto-scalable via Cloud Run.
-*   **Reliability:** Use relational integrity (Postgres) to ensure the health timeline remains consistent.
-*   **Compliance Framing:** Explicitly state the system is not a diagnostic tool; it is an organizational and explanatory aid.
+### 4.1 Report ingestion
 
-## 7. System Architecture Overview
-The system follows a **Stateful Multi-Agent Graph** architecture orchestrated by **LangGraph** and **FastAPI**.
-1.  **Intake:** User uploads to Streamlit UI -> FastAPI.
-2.  **Extraction:** **Report Understanding Agent** (Gemini 3.1 Pro) extracts data and streams explanation.
-3.  **Memory:** **Memory Agent** (SQLModel) merges data into **Postgres**.
-4.  **Fan-out:** Memory Agent triggers downstream agents:
-    *   **Doctor Brief Agent** (Gemini 3.5 Flash) + **Vertex AI Vector Search** for history lookup.
-    *   **Emergency Agent** (Gemini 3.5 Flash-Lite) for fast structured lookup.
-    *   **Language Agent** (Gemini 3.5 Flash) for translation.
-5.  **Output:** All agents stream results back to the UI via WebSockets/Streaming endpoints.
+The Streamlit client uploads PDF, image, or text reports to `POST /reports`.
+The LangGraph ingestion path is:
 
-## 8. Tech Stack
-*   **LLMs:** 
-    *   Gemini 3.1 Pro (Extraction & Reasoning)
-    *   Gemini 3.5 Flash (Summarization & Translation)
-    *   Gemini 3.5 Flash-Lite (Emergency Card Generation)
-*   **SDK:** Vertex AI SDK (`google-cloud-aiplatform`)
-*   **Orchestration:** LangGraph, FastAPI
-*   **Frontend:** Streamlit
-*   **Databases:** 
-    *   Postgres (Cloud SQL) with SQLModel (Structured Source of Truth)
-    *   Vertex AI Vector Search (Semantic History Lookup)
-*   **Infrastructure:** GCP Cloud Run, Google Cloud Storage
+```text
+Report Understanding Agent -> Memory Agent -> persisted timeline
+```
 
-## 9. Data Requirements
-### 9.1. Schema Design (Append-Only)
-The system uses a `superseded_by` pattern to maintain full history.
-*   **`patients`**: Core user data.
-*   **`reports`**: Metadata and raw JSON extractions from uploaded files.
-*   **`health_facts`**: The core "Memory" table. Stores conditions, medications, and lab values. Includes `is_emergency_relevant` flags and `superseded_by` self-references to track changes over time.
-*   **`contradictions`**: Stores AI-detected discrepancies between historical and new data.
+The fixture extractor is deterministic and intended for local demos. The
+Vertex Gemini extractor is an opt-in provider. Upload does not automatically
+run the output agents.
 
-## 10. API Specifications
-*   **`POST /upload`**: Accepts multipart file uploads, triggers the LangGraph workflow.
-*   **`GET /stream/explanation`**: WebSocket/Streaming endpoint for real-time extraction feedback.
-*   **`GET /stream/brief`**: Streaming endpoint for clinical summaries.
-*   **`GET /stream/emergency`**: Streaming endpoint for emergency card data.
-*   **`GET /stream/translate`**: Streaming endpoint for regional language output.
+### 4.2 Memory
 
-## 11. Security Requirements
-*   **Authentication:** Minimal single-user authentication for hackathon demo purposes.
-*   **Data Protection:** Framing as a "Patient-Owned" vault.
-*   **Safety Rails:** System must include explicit disclaimers that it does not provide medical diagnoses or treatment recommendations.
+The Memory Agent writes to PostgreSQL through SQLModel. Facts are append-only:
+when a value changes, a new fact is inserted and the prior fact points to it
+through `superseded_by`. Contradictions are stored separately for review.
 
-## 12. Deployment & Infrastructure
-*   **Environment:** Google Cloud Platform (GCP).
-*   **Compute:** Cloud Run for hosting the FastAPI/LangGraph backend and Streamlit frontend.
-*   **CI/CD:** Automated deployment pipeline set up during prep days to ensure every push updates the live demo URL.
-*   **Vector Indexing:** Vertex AI Vector Search index provisioned during prep days.
+### 4.3 On-demand outputs
 
-## 13. Success Metrics
-*   **Extraction Accuracy:** Correct identification of medications and dosages from scanned reports.
-*   **Latency:** Streaming explanation starts within <3 seconds of upload.
-*   **Contradiction Detection:** Successful flagging of discontinued medications during the demo.
-*   **Demo Stability:** Zero failures during the live 12-hour final presentation.
+- `POST /brief` - Doctor Brief
+- `POST /emergency` - Emergency information
+- `POST /translate?language=hi` - Language output
 
-## 14. Timeline & Milestones
-*   **Phase 1 (Prep):** 
-    *   Implement Postgres schema and SQLModel logic.
-    *   Build Report Understanding Agent with Gemini 3.1 Pro native multimodal.
-    *   Set up LangGraph orchestration and Cloud Run CI/CD.
-    *   Seed demo profile with 3-5 historical reports.
-*   **Phase 2 (Final 12 Hours - Aug 8):**
-    *   UI/UX polish.
-    *   Harden streaming connections.
-    *   End-to-end demo rehearsals.
-    *   Prepare backup pre-loaded samples.
+Deterministic output providers are the default. Vertex generation is opt-in.
 
-## 15. Open Questions & Risks
-*   **Risk:** Live OCR failure on stage due to poor lighting or unfamiliar document formats.
-    *   *Mitigation:* Pre-load a "clean" sample report as a fallback.
-*   **Risk:** Rate limits on Vertex AI during the hackathon.
-    *   *Mitigation:* Use Vertex AI SDK (higher limits) and implement basic retry logic.
-*   **Risk:** Complexity of the "Living Health Graph" logic.
-    *   *Mitigation:* Fallback to a structured tabular timeline if graph relationships become unstable.
+### 4.4 Context and interoperability
+
+`POST /mcp` exposes JSON-RPC methods for current facts, emergency facts, and
+contradictions. The backend also provides Google ADK-compatible Python tool
+functions and an optional `FunctionTool` registration helper.
+
+## 5. Functional requirements
+
+### Must have
+
+- Accept report uploads with type and size validation.
+- Associate every report and fact with a patient.
+- Store reports, facts, and contradictions in PostgreSQL.
+- Preserve fact history with `superseded_by`.
+- Display a timeline of current and superseded values.
+- Generate Doctor Brief, Emergency, and Language outputs on demand.
+- Enforce authenticated patient ownership in production.
+- Provide health/readiness endpoints and structured request metadata.
+- Provide local fixture mode without real patient data.
+
+### Planned enhancements
+
+- Streaming explanation and output responses.
+- Native Vertex multimodal extraction after cloud billing and credentials are
+  available.
+- Vector Search for semantic history retrieval.
+- Richer relationships between facts and clinical events.
+- Clinician sharing and explicit patient consent workflows.
+
+## 6. Non-functional requirements
+
+- PostgreSQL is the production source of truth.
+- Alembic migrations must run before application startup.
+- Production rate limiting must be distributed through Redis.
+- OIDC JWT validation must check issuer, audience, signature, expiry, and the
+  patient ownership claim.
+- Logs and audit events must not include report contents.
+- Optional OTLP tracing must be configurable without changing application code.
+- Required providers must fail closed when unavailable.
+- A deterministic local path must remain available for demos and tests.
+
+## 7. Architecture
+
+```text
+Streamlit
+   |
+FastAPI + security + request telemetry
+   |
+LangGraph ingestion: Report Understanding -> Memory
+   |                         |
+   |                    PostgreSQL / Alembic
+   |
+On-demand graphs: Doctor Brief | Emergency | Language
+   |
+MCP JSON-RPC context tools / optional ADK tools
+```
+
+The canonical architecture files are under `architecture/2nd arc/`. The
+Memory Agent's output is intentionally the persistence boundary; downstream
+outputs are invoked separately rather than treated as automatic fan-out.
+
+## 8. Technology decisions
+
+- Backend: FastAPI, LangGraph, SQLModel, PostgreSQL, Alembic
+- Frontend: Streamlit
+- AI provider boundary: Google Gen AI SDK through Vertex adapters
+- Storage: local development storage or optional Google Cloud Storage
+- Authentication: local static token or production OIDC JWT
+- Rate limiting: in-memory development fallback or Redis in production
+- Interoperability: MCP-compatible JSON-RPC endpoint and optional Google ADK
+  tool wrappers
+- Audit: structured local logs or optional BigQuery sink
+- Tracing: OpenTelemetry API/SDK with optional OTLP HTTP exporter
+- Deployment: Docker Compose for local production-shaped validation; Cloud Run
+  remains a deployment task, not a claimed live environment
+
+## 9. Data model
+
+The required tables are:
+
+- `patients`: patient identity and creation time
+- `reports`: source metadata and raw extraction JSONB
+- `health_facts`: typed facts, dates, confidence, emergency flag, and
+  `superseded_by`
+- `contradictions`: older/newer fact references and review state
+
+The partial index on current facts is preserved:
+
+```sql
+WHERE superseded_by IS NULL
+```
+
+## 10. API contract
+
+- `GET /health`
+- `GET /health/live`
+- `GET /health/ready`
+- `POST /reports`
+- `GET /timeline`
+- `POST /brief`
+- `POST /emergency`
+- `POST /translate`
+- `POST /mcp`
+
+Streaming endpoints and WebSockets are not part of the current contract.
+
+## 11. Security and safety
+
+Development may use a static bearer token or no authentication. Production
+must use OIDC, Redis rate limiting, and patient ownership enforcement.
+
+Every generated output must organize recorded information. It must not
+diagnose, prescribe, or silently resolve a contradiction.
+
+## 12. Operations and verification
+
+Local verification includes unit and API tests, PostgreSQL migration
+upgrade/downgrade/reapply, PostgreSQL-backed application tests, Redis-backed
+Compose startup, authenticated and unauthenticated API checks, fixture upload,
+timeline, MCP, Doctor Brief, Emergency, Language, and frontend availability.
+
+Cloud smoke tests require project credentials, enabled services, and billing.
+The current project has not claimed successful paid Vertex execution.
+
+## 13. Roadmap
+
+1. Select and configure an OIDC provider for the deployed environment.
+2. Add Cloud Run deployment and secret-management manifests.
+3. Enable and evaluate Vertex Gemini/Gemma with approved billing and data
+   controls.
+4. Add streaming only after request/response behavior is stable.
+5. Add Vector Search only when timeline retrieval needs semantic search.
+6. Add clinician sharing, consent, retention, and deletion workflows.
+7. Establish production SLOs, alerting, backup/restore drills, and security
+   review.

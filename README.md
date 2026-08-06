@@ -1,40 +1,141 @@
 # Smriti
 
-Initial skeleton for Smriti's FastAPI + LangGraph backend and Streamlit frontend.
+Smriti is a patient-owned health memory application. It turns uploaded medical
+reports into a longitudinal, append-only timeline and provides on-demand
+Doctor Brief, Emergency, and Language outputs.
+
+The current implementation is a production-oriented prototype: the local
+fixture path is fully runnable, while Vertex/Gemma, OIDC, BigQuery, AI Studio,
+and OTLP services are opt-in integrations.
+
+## Architecture
+
+- FastAPI backend in `backend/app/`
+- Streamlit frontend in `frontend/`
+- LangGraph ingestion graph: Report Understanding -> Memory
+- Separate on-demand graphs for Doctor Brief, Emergency, and Language
+- PostgreSQL source of truth with SQLModel and Alembic
+- Redis-backed production rate limiting
+- Append-only facts with `superseded_by` history and contradiction records
+- JSON-RPC MCP endpoint at `POST /mcp`
+- Optional Google ADK tool wrappers in `backend/app/adk_tools.py`
+
+Upload does not eagerly run all output agents. Outputs are generated only when
+their endpoint is called, matching the patient interaction flow.
 
 ## Run locally
+
+Development with SQLite and deterministic fixture data:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
+$env:DB_AUTO_CREATE="true"
+$env:RATE_LIMIT_BACKEND="memory"
 uvicorn backend.app.main:app --reload --port 8000
 streamlit run frontend/streamlit_app.py
 ```
 
-The upload endpoint is available at `POST /reports` and runs only the Report Understanding -> Memory ingestion path. It accepts `patient_id`, `source_type`, and opt-in `fixture=true`. The timeline is available at `GET /timeline` and includes historical facts plus unresolved contradictions. On-demand stub endpoints are available at `POST /brief`, `POST /emergency`, and `POST /translate?language=hi`.
+Use the synthetic, no-PII sample at `samples/synthetic_medical_report.txt`.
 
-## Structure
+For the production-shaped local stack, start Docker Desktop and run:
 
-- `backend/app/models.py` - SQLModel mappings for the append-only Postgres schema.
-- `backend/app/graph.py` - five-agent LangGraph skeleton with separate ingestion and on-demand output graphs.
-- `backend/app/main.py` - FastAPI upload and output endpoints.
-- `backend/app/extractor.py` - fixture and Gemini provider contract.
-- `backend/app/privacy.py` - Gemma PII-scrubbing provider boundary.
-- `frontend/streamlit_app.py` - minimal upload client.
-- `infra/schema.sql` - reference DDL matching the project context exactly.
-- `architecture/2nd arc/` - canonical architecture JSON and rendered diagram.
+```powershell
+$env:SMRITI_API_TOKEN="replace-with-a-local-secret"
+docker compose up --build
+```
 
-The canonical architecture separates report ingestion from on-demand Doctor Brief, Emergency, and Language outputs while retaining the five-agent LangGraph design.
+This starts PostgreSQL, Redis, an Alembic migration job, FastAPI, and
+Streamlit. The API is available at `http://localhost:8000`; the frontend is
+available at `http://localhost:8501`.
 
-Real uploads use the Gemini provider stub by default and do not produce facts. Set `EXTRACTION_PROVIDER=vertex` and configure Google Cloud credentials to enable the Vertex Gemini adapter. The synthetic fixture is opt-in with `fixture=true`; it is intended only for local development.
+## API
 
-Set `OUTPUT_PROVIDER=vertex` to opt into Vertex-backed Doctor Brief, Emergency Card, and Language generation. The output model IDs are configurable with `DOCTOR_BRIEF_MODEL`, `EMERGENCY_MODEL`, and `LANGUAGE_MODEL`; the deterministic outputs remain the default when billing or credentials are unavailable.
+- `GET /health` and `GET /health/live` - liveness
+- `GET /health/ready` - database readiness
+- `POST /reports` - upload a report; use `fixture=true` only for development
+- `GET /timeline` - current and superseded facts plus contradictions
+- `POST /brief` - generate Doctor Brief on demand
+- `POST /emergency` - generate Emergency output on demand
+- `POST /translate?language=hi` - generate Language output on demand
+- `POST /mcp` - MCP-compatible JSON-RPC endpoint
 
-Phase 5 integration boundaries are available behind configuration: `PROMPT_PROVIDER=local` uses the local prompt registry, `PROMPT_PROVIDER=ai_studio` is reserved for the AI Studio registry client, `MCPContextGateway` exposes MCP-shaped context tools, `adk_tools.py` contains ADK-compatible memory tools, and `AUDIT_SINK=bigquery` enables the BigQuery audit sink. These cloud integrations are explicit and fail closed when credentials or services are missing; no live MCP server, ADK runtime, AI Studio registry, or Antigravity service is claimed by the local default.
+Protected endpoints accept `Authorization: Bearer <token>` when authentication
+is enabled. Production OIDC mode requires a JWT `patient_id` claim and rejects
+cross-patient access.
 
-Security is opt-in for local development. Set `AUTH_ENABLED=true` and `SMRITI_API_TOKEN` to require a bearer token; `RATE_LIMIT_PER_MINUTE` controls the per-process limiter. Request IDs, latency, and route metadata are logged without report content, and OpenTelemetry spans activate when an SDK/exporter is configured.
+## Configuration
 
-To explicitly test Vertex extraction against one local report, configure Application Default Credentials and run `python scripts/vertex_smoke.py path/to/report.pdf`.
+Copy `.env.example` and adjust values for the target environment.
 
-For a no-PII local test input, use `samples/synthetic_medical_report.txt`.
+Important production settings:
+
+```env
+SMRITI_ENV=production
+DATABASE_URL=postgresql+psycopg://...
+DB_AUTO_CREATE=false
+AUTH_ENABLED=true
+AUTH_MODE=oidc
+OIDC_ISSUER=https://...
+OIDC_AUDIENCE=smriti-api
+OIDC_JWKS_URL=https://.../.well-known/jwks.json
+RATE_LIMIT_BACKEND=redis
+REDIS_URL=redis://...
+```
+
+For local/demo authentication, use `AUTH_MODE=token` and
+`SMRITI_API_TOKEN`. Never commit real credentials.
+
+## Optional integrations
+
+- `EXTRACTION_PROVIDER=vertex` enables the Vertex Gemini multimodal extractor.
+- `OUTPUT_PROVIDER=vertex` enables Vertex generation for the three output agents.
+- `PII_PROVIDER=vertex_gemma` enables the Vertex Gemma text PII scrubber.
+- `AUDIT_SINK=bigquery` enables BigQuery audit delivery.
+- `PROMPT_PROVIDER=ai_studio` uses the configured `AI_STUDIO_PROMPT_URL`.
+- `OTEL_ENABLED=true` enables OTLP tracing and requires
+  `OTEL_EXPORTER_OTLP_ENDPOINT`.
+- `pip install -e ".[adk]"` installs the optional Google ADK runtime; the
+  tool functions remain usable without that extra.
+
+Vertex calls require Google Cloud credentials, an enabled Vertex API, and an
+active billing configuration. Without those, use the fixture and deterministic
+providers. No real patient data is required for local verification.
+
+## Database
+
+Production schema changes use Alembic:
+
+```powershell
+$env:DATABASE_URL="postgresql+psycopg://..."
+.\.venv\Scripts\alembic.exe upgrade head
+```
+
+`infra/schema.sql` remains the canonical reference DDL. The migration preserves
+the required tables: `patients`, `reports`, `health_facts`, and
+`contradictions`, including the partial current-facts index.
+
+## Verification
+
+Run the full local suite:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m pip check
+```
+
+The suite covers schema persistence, append-only supersession, security,
+patient isolation, MCP, provider adapters, and the complete fixture flow.
+GitHub Actions also runs dependency checks, tests, and a container build.
+
+## Safety and current limits
+
+Smriti is an organizational and explanatory aid, not a diagnostic or treatment
+system. Outputs must preserve recorded facts and surface uncertainty or
+contradictions for human review.
+
+Streaming responses, Vertex Vector Search, Cloud Run deployment manifests,
+live AI Studio credentials, and live cloud-provider smoke tests remain roadmap
+items. The current API intentionally uses request/response calls and on-demand
+output generation.

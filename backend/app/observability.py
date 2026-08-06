@@ -4,6 +4,7 @@ from contextlib import contextmanager, nullcontext
 import json
 import logging
 import time
+import os
 from typing import Any, Iterator
 
 from .integrations import get_audit_sink
@@ -13,9 +14,23 @@ logger = logging.getLogger("smriti.audit")
 _tracer = None
 try:
     from opentelemetry import trace
+    if os.getenv("OTEL_ENABLED", "false").lower() == "true":
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+        endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+        if not endpoint:
+            raise RuntimeError("OTEL_EXPORTER_OTLP_ENDPOINT is required when OTEL_ENABLED=true")
+        provider = TracerProvider(
+            resource=Resource.create({"service.name": os.getenv("OTEL_SERVICE_NAME", "smriti-api")})
+        )
+        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+        trace.set_tracer_provider(provider)
 
     _tracer = trace.get_tracer("smriti")
-except ImportError:
+except (ImportError, RuntimeError):
     pass
 
 

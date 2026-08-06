@@ -7,7 +7,7 @@ from backend.app.extractor import (
     ProviderConfigurationError,
     VertexGeminiExtractor,
 )
-from backend.app.privacy import GemmaPiiScrubber, RegexPiiScrubber
+from backend.app.privacy import GemmaPiiScrubber, RegexPiiScrubber, VertexGemmaPiiScrubber
 from backend.app.generation import GenerationError, VertexTextGenerator
 
 
@@ -39,6 +39,29 @@ def test_gemma_scrubber_uses_safe_text_fallback() -> None:
     assert result.redactions == 2
     assert b"patient@example.com" not in result.content
     assert b"98765" not in result.content
+
+
+def test_vertex_gemma_scrubber_parses_redaction_response() -> None:
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            assert kwargs["model"] == "test-gemma"
+
+            class Response:
+                text = '{"content":"Call [REDACTED]", "redactions":1}'
+
+            return Response()
+
+    class FakeClient:
+        models = FakeModels()
+
+    result = VertexGemmaPiiScrubber(model="test-gemma", client=FakeClient()).scrub(
+        content=b"Call patient@example.com",
+        filename="note.txt",
+        content_type="text/plain",
+    )
+    assert result.provider == "vertex-gemma"
+    assert result.content == b"Call [REDACTED]"
+    assert result.redactions == 1
 
 
 def test_vertex_gemini_adapter_parses_structured_response() -> None:

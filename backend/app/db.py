@@ -8,10 +8,11 @@ from sqlalchemy import text
 from sqlmodel import Session, SQLModel, create_engine
 
 from . import models  # noqa: F401 - registers all table models
+from .config import settings
 
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./smriti.db")
-DB_AUTO_CREATE = os.getenv("DB_AUTO_CREATE", "true").lower() == "true"
+DATABASE_URL = settings.database_url
+DB_AUTO_CREATE = settings.db_auto_create
 _is_sqlite = DATABASE_URL.startswith("sqlite")
 engine = create_engine(
     DATABASE_URL,

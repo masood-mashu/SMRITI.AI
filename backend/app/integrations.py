@@ -9,6 +9,8 @@ import os
 from typing import Any, Protocol
 from uuid import UUID
 
+import requests
+
 from sqlmodel import Session
 
 from .repositories import get_current_facts, get_emergency_facts, get_patient_contradictions
@@ -49,12 +51,31 @@ class LocalPromptRegistry:
 
 
 class AIStudioPromptRegistry:
-    """Placeholder for a future Google AI Studio prompt registry client."""
+    """HTTP adapter for a deployed AI Studio prompt registry facade.
+
+    The registry URL is deployment-specific; the adapter accepts responses in
+    the form ``{"prompt": "..."}`` or ``{"template": "..."}``.
+    """
+
+    def __init__(self, base_url: str, api_key: str | None = None, timeout: float = 5.0) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
+        self.timeout = timeout
 
     def get(self, name: str) -> str:
-        raise IntegrationNotConfigured(
-            f"AI Studio prompt '{name}' is not configured; use PROMPT_PROVIDER=local"
-        )
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        try:
+            response = requests.get(f"{self.base_url}/prompts/{name}", headers=headers, timeout=self.timeout)
+            response.raise_for_status()
+            payload = response.json()
+            prompt = payload.get("prompt") or payload.get("template")
+            if not isinstance(prompt, str) or not prompt:
+                raise IntegrationNotConfigured(f"AI Studio prompt '{name}' response has no prompt text")
+            return prompt
+        except IntegrationNotConfigured:
+            raise
+        except Exception as exc:
+            raise IntegrationNotConfigured(f"AI Studio prompt '{name}' request failed: {exc}") from exc
 
 
 def get_prompt_registry() -> PromptRegistry:
@@ -62,7 +83,10 @@ def get_prompt_registry() -> PromptRegistry:
     if provider == "local":
         return LocalPromptRegistry()
     if provider == "ai_studio":
-        return AIStudioPromptRegistry()
+        base_url = os.getenv("AI_STUDIO_PROMPT_URL")
+        if not base_url:
+            raise IntegrationNotConfigured("AI_STUDIO_PROMPT_URL is required for PROMPT_PROVIDER=ai_studio")
+        return AIStudioPromptRegistry(base_url, os.getenv("AI_STUDIO_API_KEY"))
     raise IntegrationNotConfigured(f"Unsupported PROMPT_PROVIDER: {provider}")
 
 
@@ -104,12 +128,12 @@ class MCPContextGateway:
 class BigQueryAuditSink:
     """Opt-in sink for anonymized audit events and usage metadata."""
 
-    def __init__(self, project: str, dataset: str, table: str) -> None:
+    def __init__(self, project: str, dataset: str, table: str, client: Any | None = None) -> None:
         try:
             from google.cloud import bigquery
         except ImportError as exc:
             raise IntegrationNotConfigured("Install google-cloud-bigquery for BigQuery audit events") from exc
-        self.client = bigquery.Client(project=project)
+        self.client = client or bigquery.Client(project=project)
         self.table = f"{project}.{dataset}.{table}"
 
     def write(self, event: str, fields: dict[str, Any]) -> None:

@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: smriti
+      POSTGRES_USER: smriti
+      POSTGRES_PASSWORD: smriti
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smriti -d smriti"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      SMRITI_ENV: production
+      DATABASE_URL: postgresql+psycopg://smriti:smriti@postgres:5432/smriti
+      DB_AUTO_CREATE: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    environment:
+      SMRITI_ENV: production
+      DATABASE_URL: postgresql+psycopg://smriti:smriti@postgres:5432/smriti
+      DB_AUTO_CREATE: "false"
+      AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      SMRITI_API_TOKEN: ${SMRITI_API_TOKEN:?Set SMRITI_API_TOKEN before starting production services}
+      RATE_LIMIT_BACKEND: redis
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build: .
+    command: ["streamlit", "run", "frontend/streamlit_app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+    environment:
+      API_URL: http://api:8000
+      SMRITI_API_TOKEN: ${SMRITI_API_TOKEN:?Set SMRITI_API_TOKEN before starting production services}
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  redis-data:

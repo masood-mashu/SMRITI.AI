@@ -1,19 +1,34 @@
-"""Opt-in API security and per-process rate limiting."""
+"""Authentication, patient authorization, and rate limiting."""
 
 from collections import defaultdict, deque
+from dataclasses import dataclass
 from hmac import compare_digest
 import os
 import threading
 import time
+from typing import Any
+from uuid import UUID
 
+import jwt
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from .config import Settings
 
 
 bearer = HTTPBearer(auto_error=False)
 
 
+@dataclass(frozen=True)
+class AuthContext:
+    subject: str
+    patient_id: str | None
+    mode: str
+
+
 class RateLimiter:
+    """Development fallback; use Redis for multi-instance deployments."""
+
     def __init__(self) -> None:
         self._events: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
@@ -29,25 +44,90 @@ class RateLimiter:
             events.append(now)
 
 
+class RedisRateLimiter:
+    def __init__(self, url: str) -> None:
+        try:
+            import redis
+            self._client = redis.Redis.from_url(url, decode_responses=True)
+        except ImportError as exc:
+            raise HTTPException(status_code=503, detail="Redis rate limiting is not installed") from exc
+
+    def check(self, key: str, limit: int) -> None:
+        bucket = f"smriti:rate:{key}:{int(time.time() // 60)}"
+        try:
+            count = self._client.incr(bucket)
+            if count == 1:
+                self._client.expire(bucket, 61)
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="Rate-limit service unavailable") from exc
+        if count > limit:
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+
 rate_limiter = RateLimiter()
+_redis_limiters: dict[str, RedisRateLimiter] = {}
+_oidc_clients: dict[str, Any] = {}
+
+
+def _oidc_context(token: str, settings: Settings) -> AuthContext:
+    if not settings.oidc_issuer or not settings.oidc_audience:
+        raise HTTPException(status_code=503, detail="OIDC authentication is not configured")
+    jwks_url = settings.oidc_jwks_url or f"{settings.oidc_issuer.rstrip('/')}/.well-known/jwks.json"
+    try:
+        client = _oidc_clients.get(jwks_url)
+        if client is None:
+            client = jwt.PyJWKClient(jwks_url, cache_jwk_set=True)
+            _oidc_clients[jwks_url] = client
+        signing_key = client.get_signing_key_from_jwt(token)
+        claims = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256", "ES256"],
+            audience=settings.oidc_audience,
+            issuer=settings.oidc_issuer,
+            options={"require": ["sub", "exp", "iat"]},
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Invalid OIDC token") from exc
+    patient_id = claims.get("patient_id")
+    if patient_id is not None:
+        try:
+            patient_id = str(UUID(str(patient_id)))
+        except ValueError as exc:
+            raise HTTPException(status_code=401, detail="Invalid patient claim") from exc
+    return AuthContext(
+        subject=str(claims["sub"]),
+        patient_id=patient_id,
+        mode="oidc",
+    )
 
 
 def require_security(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
 ) -> None:
+    settings = Settings.from_env()
     client_key = request.client.host if request.client else "unknown"
-    limit = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
-    rate_limiter.check(client_key, limit)
+    if settings.rate_limit_backend == "redis":
+        if not settings.redis_url:
+            raise HTTPException(status_code=503, detail="Redis rate limiting is not configured")
+        limiter = _redis_limiters.setdefault(settings.redis_url, RedisRateLimiter(settings.redis_url))
+    else:
+        limiter = rate_limiter
+    limiter.check(client_key, settings.rate_limit_per_minute)
 
-    if os.getenv("AUTH_ENABLED", "false").lower() != "true":
+    if not settings.auth_enabled:
+        request.state.auth = None
         return
-
-    expected = os.getenv("SMRITI_API_TOKEN")
-    if not expected:
-        raise HTTPException(status_code=503, detail="Authentication is enabled but not configured")
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Bearer authentication required")
-    if not compare_digest(credentials.credentials, expected):
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
 
+    if settings.auth_mode == "oidc":
+        context = _oidc_context(credentials.credentials, settings)
+    else:
+        if not settings.api_token:
+            raise HTTPException(status_code=503, detail="Token authentication is not configured")
+        if not compare_digest(credentials.credentials, settings.api_token):
+            raise HTTPException(status_code=401, detail="Invalid bearer token")
+        context = AuthContext(subject="static-token", patient_id=None, mode="token")
+    request.state.auth = context
