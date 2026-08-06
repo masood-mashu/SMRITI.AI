@@ -4,6 +4,7 @@ from backend.app.extractor import (
     ExtractionError,
     FixtureExtractor,
     GeminiExtractorStub,
+    ProviderConfigurationError,
     VertexGeminiExtractor,
 )
 from backend.app.privacy import GemmaPiiScrubber, RegexPiiScrubber
@@ -75,6 +76,15 @@ def test_vertex_gemini_adapter_rejects_unsafe_fact_shape() -> None:
 
     with pytest.raises(ExtractionError, match="invalid extraction JSON"):
         VertexGeminiExtractor(client=FakeClient()).extract(
+            filename="report.pdf",
+            content_type="application/pdf",
+            content=b"pdf-bytes",
+        )
+
+
+def test_vertex_gemini_adapter_reports_missing_project() -> None:
+    with pytest.raises(ProviderConfigurationError, match="GOOGLE_CLOUD_PROJECT"):
+        VertexGeminiExtractor(project=None).extract(
             filename="report.pdf",
             content_type="application/pdf",
             content=b"pdf-bytes",

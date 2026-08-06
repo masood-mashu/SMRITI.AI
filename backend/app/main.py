@@ -1,8 +1,9 @@
 from uuid import UUID
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 
 from .db import init_db, session_scope
+from .extractor import ExtractionError, ProviderConfigurationError
 from .graph import (
     doctor_brief_graph,
     emergency_graph,
@@ -55,14 +56,19 @@ async def upload_report(
     fixture: bool = False,
 ) -> dict:
     content = await file.read()
-    result = smriti_ingestion_graph.invoke({
-        "patient_id": resolve_patient_id(patient_id),
-        "filename": file.filename or "upload",
-        "content_type": file.content_type or "application/octet-stream",
-        "source_type": "other",
-        "use_fixture": fixture,
-        "report_bytes": content,
-    })
+    try:
+        result = smriti_ingestion_graph.invoke({
+            "patient_id": resolve_patient_id(patient_id),
+            "filename": file.filename or "upload",
+            "content_type": file.content_type or "application/octet-stream",
+            "source_type": "other",
+            "use_fixture": fixture,
+            "report_bytes": content,
+        })
+    except ProviderConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ExtractionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     result.pop("report_bytes", None)
     return {"status": "accepted", "filename": file.filename, "graph": result}
 

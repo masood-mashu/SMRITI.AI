@@ -24,6 +24,10 @@ class ExtractionError(RuntimeError):
     """Raised when a provider response cannot be trusted as structured data."""
 
 
+class ProviderConfigurationError(ExtractionError):
+    """Raised when a configured provider cannot be initialized."""
+
+
 class ExtractedFact(BaseModel):
     fact_type: Literal[
         "condition",
@@ -125,7 +129,7 @@ class VertexGeminiExtractor:
             from google import genai
 
             if not self.project:
-                raise RuntimeError("GOOGLE_CLOUD_PROJECT is required for Vertex Gemini")
+                raise ProviderConfigurationError("GOOGLE_CLOUD_PROJECT is required for Vertex Gemini")
             self._client = genai.Client(
                 vertexai=True,
                 project=self.project,
