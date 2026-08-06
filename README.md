@@ -31,6 +31,8 @@ Real uploads use the Gemini provider stub by default and do not produce facts. S
 
 Set `OUTPUT_PROVIDER=vertex` to opt into Vertex-backed Doctor Brief, Emergency Card, and Language generation. The output model IDs are configurable with `DOCTOR_BRIEF_MODEL`, `EMERGENCY_MODEL`, and `LANGUAGE_MODEL`; the deterministic outputs remain the default when billing or credentials are unavailable.
 
+Security is opt-in for local development. Set `AUTH_ENABLED=true` and `SMRITI_API_TOKEN` to require a bearer token; `RATE_LIMIT_PER_MINUTE` controls the per-process limiter. Request IDs, latency, and route metadata are logged without report content, and OpenTelemetry spans activate when an SDK/exporter is configured.
+
 To explicitly test Vertex extraction against one local report, configure Application Default Credentials and run `python scripts/vertex_smoke.py path/to/report.pdf`.
 
 For a no-PII local test input, use `samples/synthetic_medical_report.txt`.

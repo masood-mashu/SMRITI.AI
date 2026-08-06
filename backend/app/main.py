@@ -1,8 +1,10 @@
 from uuid import UUID
 from pathlib import Path
 from typing import Literal
+import time
+from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from .db import init_db, session_scope
@@ -17,6 +19,8 @@ from .graph import (
 from .repositories import get_fact_timeline, get_patient_contradictions
 from .models import HealthFact
 from .storage import StorageError, get_storage
+from .observability import audit_log, trace_span
+from .security import require_security
 
 app = FastAPI(title="Smriti API", version="0.1.0")
 DEFAULT_PATIENT_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -28,6 +32,24 @@ ALLOWED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".txt"}
 @app.exception_handler(GenerationError)
 async def generation_error_handler(request: Request, exc: GenerationError) -> JSONResponse:
     return JSONResponse(status_code=502, content={"detail": str(exc)})
+
+
+@app.middleware("http")
+async def request_observability(request: Request, call_next):
+    request_id = str(uuid4())
+    started = time.perf_counter()
+    with trace_span("http.request", method=request.method, path=request.url.path):
+        response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    audit_log(
+        "http_request",
+        request_id=request_id,
+        method=request.method,
+        path=request.url.path,
+        status_code=response.status_code,
+        duration_ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+    return response
 
 
 def resolve_patient_id(patient_id: UUID | None) -> str:
@@ -71,7 +93,7 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/reports")
+@app.post("/reports", dependencies=[Depends(require_security)])
 async def upload_report(
     file: UploadFile = File(...),
     patient_id: UUID | None = None,
@@ -110,7 +132,7 @@ async def upload_report(
     return {"status": "accepted", "filename": file.filename, "graph": result}
 
 
-@app.get("/timeline")
+@app.get("/timeline", dependencies=[Depends(require_security)])
 def get_timeline(patient_id: UUID | None = None) -> dict:
     resolved_id = UUID(resolve_patient_id(patient_id))
     with session_scope() as session:
@@ -133,19 +155,19 @@ def get_timeline(patient_id: UUID | None = None) -> dict:
     }
 
 
-@app.post("/brief")
+@app.post("/brief", dependencies=[Depends(require_security)])
 def generate_doctor_brief(patient_id: UUID | None = None) -> dict:
     result = doctor_brief_graph.invoke({"patient_id": resolve_patient_id(patient_id)})
     return {"status": "generated", "graph": result}
 
 
-@app.post("/emergency")
+@app.post("/emergency", dependencies=[Depends(require_security)])
 def generate_emergency_card(patient_id: UUID | None = None) -> dict:
     result = emergency_graph.invoke({"patient_id": resolve_patient_id(patient_id)})
     return {"status": "generated", "graph": result}
 
 
-@app.post("/translate")
+@app.post("/translate", dependencies=[Depends(require_security)])
 def translate_output(patient_id: UUID | None = None, language: str = "en") -> dict:
     result = language_graph.invoke({
         "patient_id": resolve_patient_id(patient_id),
