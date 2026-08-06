@@ -5,7 +5,8 @@ from typing import Any, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from .db import session_scope
-from .extractor import extract_report
+from .extractor import get_extractor
+from .privacy import get_pii_scrubber
 from .repositories import (
     get_current_facts,
     get_emergency_facts,
@@ -25,6 +26,9 @@ class SmritiState(TypedDict, total=False):
     memory_updated: bool
     report_id: str
     use_fixture: bool
+    pii_redactions: int
+    pii_provider: str
+    extraction_provider: str
     persisted_fact_ids: list[str]
     contradiction_ids: list[str]
     current_facts: list[dict[str, Any]]
@@ -38,13 +42,22 @@ class SmritiState(TypedDict, total=False):
 
 def report_understanding_agent(state: SmritiState) -> dict[str, Any]:
     """Development extractor boundary; Gemini will replace this implementation."""
-    extraction = extract_report(
+    scrubbed = get_pii_scrubber().scrub(
+        content=state.get("report_bytes", b""),
         filename=state.get("filename", "file"),
-        use_fixture=state.get("use_fixture", False),
+        content_type=state.get("content_type", "application/octet-stream"),
+    )
+    extraction = get_extractor(use_fixture=state.get("use_fixture", False)).extract(
+        filename=state.get("filename", "file"),
+        content_type=state.get("content_type", "application/octet-stream"),
+        content=scrubbed.content,
     )
     return {
-        "extracted_facts": extraction["facts"],
-        "explanation": extraction["explanation"],
+        "extracted_facts": extraction.facts,
+        "explanation": extraction.explanation,
+        "pii_redactions": scrubbed.redactions,
+        "pii_provider": scrubbed.provider,
+        "extraction_provider": extraction.provider,
     }
 
 

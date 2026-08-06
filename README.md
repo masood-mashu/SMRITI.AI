@@ -19,8 +19,12 @@ The upload endpoint is available at `POST /reports` and runs only the Report Und
 - `backend/app/models.py` - SQLModel mappings for the append-only Postgres schema.
 - `backend/app/graph.py` - five-agent LangGraph skeleton with separate ingestion and on-demand output graphs.
 - `backend/app/main.py` - FastAPI upload and output endpoints.
+- `backend/app/extractor.py` - fixture and Gemini provider contract.
+- `backend/app/privacy.py` - Gemma PII-scrubbing provider boundary.
 - `frontend/streamlit_app.py` - minimal upload client.
 - `infra/schema.sql` - reference DDL matching the project context exactly.
 - `architecture/2nd arc/` - canonical architecture JSON and rendered diagram.
 
 The canonical architecture separates report ingestion from on-demand Doctor Brief, Emergency, and Language outputs while retaining the five-agent LangGraph design.
+
+Real uploads currently use the Gemini provider stub and do not produce facts. The synthetic fixture is opt-in with `fixture=true`; it is intended only for local development until the Vertex AI and Gemma adapters are connected.
