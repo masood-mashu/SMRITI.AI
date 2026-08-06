@@ -158,11 +158,16 @@ treatment, or infer missing information. Return JSON with this exact shape:
             file_part = {"data": content, "mime_type": content_type}
             config = {"response_mime_type": "application/json", "temperature": 0}
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=[prompt, file_part],
-            config=config,
-        )
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=[prompt, file_part],
+                config=config,
+            )
+        except ProviderConfigurationError:
+            raise
+        except Exception as exc:
+            raise ExtractionError(f"Vertex Gemini request failed: {exc}") from exc
         return self._parse_response(response.text)
 
     def _parse_response(self, text: str) -> ExtractionResult:

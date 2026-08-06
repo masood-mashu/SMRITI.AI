@@ -89,3 +89,19 @@ def test_vertex_gemini_adapter_reports_missing_project() -> None:
             content_type="application/pdf",
             content=b"pdf-bytes",
         )
+
+
+def test_vertex_gemini_adapter_wraps_request_errors() -> None:
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            raise RuntimeError("billing disabled")
+
+    class FakeClient:
+        models = FakeModels()
+
+    with pytest.raises(ExtractionError, match="Vertex Gemini request failed"):
+        VertexGeminiExtractor(client=FakeClient()).extract(
+            filename="report.pdf",
+            content_type="application/pdf",
+            content=b"pdf-bytes",
+        )

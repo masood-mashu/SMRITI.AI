@@ -1,0 +1,15 @@
+SMRITI SYNTHETIC DEMO REPORT - NOT A REAL PATIENT
+Report date: 2026-08-06
+
+Patient: Demo Patient
+
+Allergy:
+- Penicillin: severe reaction reported.
+
+Medication:
+- Metformin 500 mg, current medication in this synthetic example.
+
+Condition:
+- Type 2 diabetes, recorded in this synthetic example.
+
+This document contains fictional data for local integration testing only.

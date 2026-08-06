@@ -8,3 +8,5 @@ venv/
 *.egg-info/
 .vscode/
 *.db
+samples/*
+!samples/synthetic_medical_report.txt
