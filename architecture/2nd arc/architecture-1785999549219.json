@@ -67,7 +67,7 @@
     {
       "id": "fastapi-backend",
       "type": "api-gateway",
-      "label": "FastAPI Backend",
+      "label": "FastAPI Secure Gateway",
       "generic_name": "Backend API",
       "ports": [
         {
@@ -94,16 +94,31 @@
           "id": "left-4",
           "label": "Left 4",
           "side": "left"
+        },
+        {
+          "id": "right-2",
+          "label": "Right 2",
+          "side": "right"
+        },
+        {
+          "id": "right-3",
+          "label": "Right 3",
+          "side": "right"
+        },
+        {
+          "id": "right-4",
+          "side": "right",
+          "label": "Right 4"
         }
       ],
       "data": {
-        "description": "Orchestrates the multi-agent workflow using LangGraph and serves the API for the frontend.",
+        "description": "Orchestrates LangGraph workflow with OAuth2/OIDC security and rate limiting.",
         "tech": [
           "FastAPI",
-          "Python",
+          "OAuth2/OIDC",
+          "Rate Limiting",
           "LangGraph"
-        ],
-        "isolated": false
+        ]
       }
     },
     {
@@ -129,16 +144,27 @@
         },
         {
           "id": "right-2",
-          "side": "right",
-          "label": "Right 2"
+          "label": "Right 2",
+          "side": "right"
+        },
+        {
+          "id": "left-2",
+          "label": "Left 2",
+          "side": "left"
+        },
+        {
+          "id": "left-3",
+          "side": "left",
+          "label": "Left 3"
         }
       ],
       "data": {
-        "description": "Extracts structured medical facts from reports using Gemini 3.1 Pro's native multimodal capabilities. Streams plain-language explanations back to the UI.",
         "tech": [
           "Python",
-          "Gemini 3.1 Pro (Native Multimodal)",
-          "LangGraph"
+          "Gemini 3.1 Pro",
+          "Google ADK",
+          "MCP",
+          "A2A"
         ]
       }
     },
@@ -180,8 +206,18 @@
         },
         {
           "id": "right-5",
+          "label": "Right 5",
+          "side": "right"
+        },
+        {
+          "id": "right-6",
+          "label": "Right 6",
+          "side": "right"
+        },
+        {
+          "id": "right-7",
           "side": "right",
-          "label": "Right 5"
+          "label": "Right 7"
         }
       ],
       "data": {
@@ -226,16 +262,22 @@
         },
         {
           "id": "right-3",
+          "label": "Right 3",
+          "side": "right"
+        },
+        {
+          "id": "right-4",
           "side": "right",
-          "label": "Right 3"
+          "label": "Right 4"
         }
       ],
       "data": {
-        "description": "Generates clinical summaries and flags contradictions using history lookup.",
         "tech": [
           "Python",
           "Gemini 3.5 Flash",
-          "LangGraph"
+          "Google ADK",
+          "MCP",
+          "A2A"
         ]
       }
     },
@@ -277,11 +319,12 @@
         }
       ],
       "data": {
-        "description": "Generates critical-info cards from structured memory lookups.",
         "tech": [
           "Python",
           "Gemini 3.5 Flash-Lite",
-          "LangGraph"
+          "Google ADK",
+          "MCP",
+          "A2A"
         ]
       }
     },
@@ -313,11 +356,12 @@
         }
       ],
       "data": {
-        "description": "Translates outputs into plain language and regional languages (Kannada, Hindi).",
         "tech": [
           "Python",
           "Gemini 3.5 Flash",
-          "LangGraph"
+          "Google ADK",
+          "MCP",
+          "A2A"
         ]
       }
     },
@@ -349,8 +393,13 @@
         },
         {
           "id": "left-2",
+          "label": "Left 2",
+          "side": "left"
+        },
+        {
+          "id": "left-3",
           "side": "left",
-          "label": "Left 2"
+          "label": "Left 3"
         }
       ],
       "data": {
@@ -383,8 +432,13 @@
         },
         {
           "id": "left-2",
+          "label": "Left 2",
+          "side": "left"
+        },
+        {
+          "id": "left-3",
           "side": "left",
-          "label": "Left 2"
+          "label": "Left 3"
         }
       ],
       "data": {
@@ -392,6 +446,190 @@
           "Vertex AI Vector Search",
           "Google Cloud Storage"
         ]
+      }
+    },
+    {
+      "id": "gemma-pii-scrubber",
+      "type": "service",
+      "label": "Gemma PII Scrubber",
+      "generic_name": "PII Scrubber",
+      "ports": [
+        {
+          "id": "in",
+          "label": "Raw Data",
+          "side": "left"
+        },
+        {
+          "id": "out",
+          "label": "Clean Data",
+          "side": "right"
+        }
+      ],
+      "data": {
+        "description": "Performs local, privacy-preserving PII scrubbing on medical reports before cloud processing.",
+        "tech": [
+          "Gemma 2B/7B",
+          "Cloud Run",
+          "Python"
+        ],
+        "cloud": "gcp",
+        "isolated": false
+      }
+    },
+    {
+      "id": "bigquery-analytics",
+      "type": "database",
+      "label": "BigQuery Analytics",
+      "generic_name": "Analytics Warehouse",
+      "ports": [
+        {
+          "id": "in",
+          "label": "Sync",
+          "side": "left"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
+        }
+      ],
+      "data": {
+        "description": "Analytical data warehouse for anonymized long-term health trends and audit logs.",
+        "tech": [
+          "BigQuery",
+          "Google Cloud"
+        ],
+        "cloud": "gcp",
+        "isolated": false
+      }
+    },
+    {
+      "id": "antigravity-secure-enclave",
+      "type": "service",
+      "label": "Antigravity Secure Enclave",
+      "generic_name": "Privacy Enclave",
+      "ports": [
+        {
+          "id": "inout",
+          "label": "Secure State",
+          "side": "right"
+        },
+        {
+          "id": "in",
+          "label": "Input",
+          "side": "left"
+        }
+      ],
+      "data": {
+        "description": "Manages secure, privacy-preserving computations and encrypted state transitions for health profiles.",
+        "tech": [
+          "Antigravity",
+          "Confidential Computing"
+        ],
+        "cloud": "gcp",
+        "isolated": true
+      }
+    },
+    {
+      "id": "mcp-context-gateway",
+      "type": "service",
+      "label": "MCP Context Gateway",
+      "generic_name": "Context Gateway",
+      "ports": [
+        {
+          "id": "in",
+          "label": "Queries",
+          "side": "left"
+        },
+        {
+          "id": "out-db",
+          "label": "Postgres",
+          "side": "right"
+        },
+        {
+          "id": "out-vector",
+          "label": "Vector Search",
+          "side": "bottom"
+        },
+        {
+          "id": "right-2",
+          "side": "right",
+          "label": "Right 2"
+        }
+      ],
+      "data": {
+        "description": "Standardized protocol for context retrieval from Postgres and Vector Search.",
+        "tech": [
+          "MCP (Model Context Protocol)",
+          "Python"
+        ],
+        "cloud": "gcp",
+        "isolated": false
+      }
+    },
+    {
+      "id": "ai-studio-registry",
+      "type": "service",
+      "label": "AI Studio Prompt Registry",
+      "generic_name": "Prompt Registry",
+      "ports": [
+        {
+          "id": "out",
+          "label": "Prompts",
+          "side": "bottom"
+        },
+        {
+          "id": "in",
+          "label": "in",
+          "side": "left"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
+        }
+      ],
+      "data": {
+        "description": "Prompt management registry and rapid prototyping playground for agent system instructions.",
+        "tech": [
+          "AI Studio",
+          "Google Cloud"
+        ],
+        "cloud": "gcp",
+        "isolated": false
+      }
+    },
+    {
+      "id": "otel-observability",
+      "type": "service",
+      "label": "OpenTelemetry Observability",
+      "generic_name": "Observability Stack",
+      "ports": [
+        {
+          "id": "in-trace",
+          "label": "Traces/Logs",
+          "side": "top"
+        },
+        {
+          "id": "in",
+          "label": "Input",
+          "side": "left"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
+        }
+      ],
+      "data": {
+        "description": "Centralized tracing, logging, and token usage monitoring for the 5-agent pipeline.",
+        "tech": [
+          "OpenTelemetry",
+          "Cloud Trace",
+          "Cloud Logging"
+        ],
+        "cloud": "gcp",
+        "isolated": true
       }
     }
   ],
@@ -514,19 +752,6 @@
       "label": "Stream Translation"
     },
     {
-      "id": "streamlit-to-fastapi",
-      "source": {
-        "nodeId": "streamlit-ui",
-        "portId": "out-upload"
-      },
-      "target": {
-        "nodeId": "fastapi-backend",
-        "portId": "left-4"
-      },
-      "type": "http",
-      "label": "Upload/Request"
-    },
-    {
       "id": "fastapi-to-understanding",
       "source": {
         "nodeId": "fastapi-backend",
@@ -616,29 +841,196 @@
       },
       "type": "database",
       "label": "History Lookup"
+    },
+    {
+      "id": "ui-to-gateway-secure",
+      "source": {
+        "nodeId": "streamlit-ui",
+        "portId": "out-upload"
+      },
+      "target": {
+        "nodeId": "fastapi-backend",
+        "portId": "left-4"
+      },
+      "type": "http",
+      "label": "HTTPS (OAuth2)"
+    },
+    {
+      "id": "gateway-to-gemma",
+      "source": {
+        "nodeId": "fastapi-backend",
+        "portId": "right-2"
+      },
+      "target": {
+        "nodeId": "gemma-pii-scrubber",
+        "portId": "in"
+      },
+      "type": "internal-api",
+      "label": "PII Scrubbing"
+    },
+    {
+      "id": "gemma-to-understanding",
+      "source": {
+        "nodeId": "gemma-pii-scrubber",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "report-understanding-agent",
+        "portId": "left-2"
+      },
+      "type": "internal-api",
+      "label": "Clean Data"
+    },
+    {
+      "id": "memory-to-antigravity",
+      "source": {
+        "nodeId": "memory-agent",
+        "portId": "right-6"
+      },
+      "target": {
+        "nodeId": "antigravity-secure-enclave",
+        "portId": "in"
+      },
+      "type": "internal-api",
+      "label": "Secure State"
+    },
+    {
+      "id": "memory-to-bigquery",
+      "source": {
+        "nodeId": "memory-agent",
+        "portId": "right-7"
+      },
+      "target": {
+        "nodeId": "bigquery-analytics",
+        "portId": "in"
+      },
+      "type": "database",
+      "label": "Analytics Sync"
+    },
+    {
+      "id": "agents-to-mcp",
+      "source": {
+        "nodeId": "doctor-brief-agent",
+        "portId": "right-4"
+      },
+      "target": {
+        "nodeId": "mcp-context-gateway",
+        "portId": "in"
+      },
+      "type": "internal-api",
+      "label": "Context Request"
+    },
+    {
+      "id": "mcp-to-postgres",
+      "source": {
+        "nodeId": "mcp-context-gateway",
+        "portId": "out-db"
+      },
+      "target": {
+        "nodeId": "health-profile-db",
+        "portId": "left-3"
+      },
+      "type": "database",
+      "label": "SQL Query"
+    },
+    {
+      "id": "mcp-to-vector",
+      "source": {
+        "nodeId": "mcp-context-gateway",
+        "portId": "right-2"
+      },
+      "target": {
+        "nodeId": "report-vector-store-db",
+        "portId": "left-3"
+      },
+      "type": "database",
+      "label": "Vector Search"
+    },
+    {
+      "id": "agents-to-ai-studio",
+      "source": {
+        "nodeId": "ai-studio-registry",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "report-understanding-agent",
+        "portId": "left-3"
+      },
+      "type": "internal-api",
+      "label": "Fetch Prompts"
+    },
+    {
+      "id": "all-to-otel",
+      "source": {
+        "nodeId": "fastapi-backend",
+        "portId": "right-3"
+      },
+      "target": {
+        "nodeId": "otel-observability",
+        "portId": "in"
+      },
+      "type": "async-event",
+      "label": "Telemetry"
+    },
+    {
+      "id": "7d5ddb35-e859-42cc-ab18-541407aea916",
+      "source": {
+        "nodeId": "fastapi-backend",
+        "portId": "right-4"
+      },
+      "target": {
+        "nodeId": "ai-studio-registry",
+        "portId": "in"
+      },
+      "type": "internal-api",
+      "label": null
     }
   ],
   "groups": [
     {
       "children": [
-        "health-profile-db",
-        "report-vector-store-db"
+        "streamlit-ui",
+        "fastapi-backend"
       ],
-      "id": "data-persistence",
-      "label": "GCP Managed Data Services"
+      "id": "edge-layer-group",
+      "label": "Edge & Security Layer"
     },
     {
       "children": [
-        "streamlit-ui",
-        "fastapi-backend",
+        "gemma-pii-scrubber",
+        "antigravity-secure-enclave"
+      ],
+      "id": "privacy-enclave-group",
+      "label": "Privacy & Confidential Computing"
+    },
+    {
+      "children": [
         "report-understanding-agent",
         "memory-agent",
         "doctor-brief-agent",
         "emergency-agent",
-        "language-agent"
+        "language-agent",
+        "ai-studio-registry",
+        "mcp-context-gateway"
       ],
-      "id": "cloud-run-deployment",
-      "label": "GCP Cloud Run (Application Layer)"
+      "id": "agent-mesh-group",
+      "label": "Agentic Mesh (ADK/MCP/A2A)"
+    },
+    {
+      "children": [
+        "health-profile-db",
+        "report-vector-store-db",
+        "bigquery-analytics"
+      ],
+      "id": "data-persistence-group",
+      "label": "Enterprise Data Layer"
+    },
+    {
+      "children": [
+        "otel-observability"
+      ],
+      "id": "observability-group",
+      "label": "Observability & Tracing"
     }
   ],
   "metadata": {}
