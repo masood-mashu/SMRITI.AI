@@ -15,6 +15,7 @@ def test_fixture_upload_populates_timeline() -> None:
         assert upload.status_code == 200
         assert upload.json()["graph"]["memory_updated"] is True
         assert len(upload.json()["graph"]["persisted_fact_ids"]) == 3
+        assert upload.json()["graph"]["file_url"].startswith("local://")
 
         timeline = client.get(f"/timeline?patient_id={patient_id}")
         assert timeline.status_code == 200
@@ -25,3 +26,12 @@ def test_fixture_upload_populates_timeline() -> None:
             "Penicillin",
         }
         assert timeline.json()["contradictions"] == []
+
+
+def test_empty_upload_is_rejected() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/reports",
+            files={"file": ("empty.pdf", b"", "application/pdf")},
+        )
+        assert response.status_code == 400

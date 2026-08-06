@@ -4,12 +4,14 @@ from contextlib import contextmanager
 import os
 from collections.abc import Iterator
 
+from sqlalchemy import text
 from sqlmodel import Session, SQLModel, create_engine
 
 from . import models  # noqa: F401 - registers all table models
 
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./smriti.db")
+DB_AUTO_CREATE = os.getenv("DB_AUTO_CREATE", "true").lower() == "true"
 _is_sqlite = DATABASE_URL.startswith("sqlite")
 engine = create_engine(
     DATABASE_URL,
@@ -23,10 +25,16 @@ _initialized = False
 def init_db() -> None:
     """Create the mapped tables for local development and first boot."""
     global _initialized
-    if _initialized:
+    if _initialized or not DB_AUTO_CREATE:
         return
     SQLModel.metadata.create_all(engine)
     _initialized = True
+
+
+def check_database() -> bool:
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+    return True
 
 
 @contextmanager

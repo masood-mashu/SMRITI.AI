@@ -26,7 +26,7 @@ class Report(SQLModel, table=True):
     patient_id: UUID = Field(foreign_key="patients.patient_id", nullable=False)
     source_type: str = Field(sa_column=Column(Text, nullable=False))
     uploaded_at: datetime = Field(default_factory=utc_now, nullable=False)
-    file_url: Optional[str] = None
+    file_url: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
     raw_extraction: Optional[dict[str, Any]] = Field(
         default=None,
         sa_column=Column(JSONB().with_variant(JSON, "sqlite")),

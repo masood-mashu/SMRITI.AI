@@ -1,4 +1,6 @@
 from uuid import UUID
+from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 
@@ -12,13 +14,26 @@ from .graph import (
 )
 from .repositories import get_fact_timeline, get_patient_contradictions
 from .models import HealthFact
+from .storage import StorageError, get_storage
 
 app = FastAPI(title="Smriti API", version="0.1.0")
 DEFAULT_PATIENT_ID = UUID("00000000-0000-0000-0000-000000000001")
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+ALLOWED_CONTENT_TYPES = {"application/pdf", "image/png", "image/jpeg", "text/plain"}
+ALLOWED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".txt"}
 
 
 def resolve_patient_id(patient_id: UUID | None) -> str:
     return str(patient_id or DEFAULT_PATIENT_ID)
+
+
+def validate_upload(*, filename: str, content_type: str, content: bytes) -> None:
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded report is empty")
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Uploaded report exceeds the 10 MB limit")
+    if content_type not in ALLOWED_CONTENT_TYPES and Path(filename).suffix.lower() not in ALLOWED_SUFFIXES:
+        raise HTTPException(status_code=415, detail="Unsupported report type")
 
 
 def serialize_fact(fact: HealthFact) -> dict:
@@ -53,10 +68,23 @@ def health() -> dict[str, str]:
 async def upload_report(
     file: UploadFile = File(...),
     patient_id: UUID | None = None,
-    source_type: str = "other",
+    source_type: Literal["lab_result", "discharge_summary", "prescription", "other"] = "other",
     fixture: bool = False,
 ) -> dict:
     content = await file.read()
+    validate_upload(
+        filename=file.filename or "upload",
+        content_type=file.content_type or "application/octet-stream",
+        content=content,
+    )
+    try:
+        file_url = get_storage().store(
+            filename=file.filename or "upload",
+            content=content,
+            content_type=file.content_type or "application/octet-stream",
+        )
+    except StorageError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     try:
         result = smriti_ingestion_graph.invoke({
             "patient_id": resolve_patient_id(patient_id),
@@ -64,6 +92,7 @@ async def upload_report(
             "content_type": file.content_type or "application/octet-stream",
             "source_type": source_type,
             "use_fixture": fixture,
+            "file_url": file_url,
             "report_bytes": content,
         })
     except ProviderConfigurationError as exc:

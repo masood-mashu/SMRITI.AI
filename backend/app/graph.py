@@ -25,6 +25,7 @@ class SmritiState(TypedDict, total=False):
     extracted_facts: list[dict[str, Any]]
     memory_updated: bool
     report_id: str
+    file_url: str
     use_fixture: bool
     pii_redactions: int
     pii_provider: str
@@ -73,6 +74,7 @@ def memory_agent(state: SmritiState) -> dict[str, Any]:
             source_type=state.get("source_type", "other"),
             raw_extraction={"facts": state.get("extracted_facts", [])},
             extracted_facts=state.get("extracted_facts", []),
+            file_url=state.get("file_url"),
         )
         return {
             "memory_updated": True,

@@ -32,6 +32,7 @@ def persist_report_and_facts(
     source_type: str,
     raw_extraction: dict[str, Any] | None,
     extracted_facts: list[dict[str, Any]],
+    file_url: str | None = None,
     display_name: str = "Smriti patient",
 ) -> tuple[Report, list[HealthFact], list[Contradiction]]:
     """Insert a report and merge extracted facts without overwriting history."""
@@ -39,6 +40,7 @@ def persist_report_and_facts(
     report = Report(
         patient_id=patient_id,
         source_type=source_type,
+        file_url=file_url,
         raw_extraction=json_safe(raw_extraction),
     )
     session.add(report)
