@@ -10,6 +10,7 @@ class SmritiState(TypedDict, total=False):
     filename: str
     content_type: str
     report_bytes: bytes
+    target_language: str
     extracted_facts: list[dict[str, Any]]
     memory_updated: bool
     explanation: str
@@ -43,23 +44,25 @@ def language_agent(state: SmritiState) -> dict[str, str]:
     return {"translation": "Language Agent stub"}
 
 
-def build_graph():
+def build_ingestion_graph():
     graph = StateGraph(SmritiState)
     graph.add_node("report_understanding", report_understanding_agent)
     graph.add_node("memory", memory_agent)
-    graph.add_node("doctor_brief", doctor_brief_agent)
-    graph.add_node("emergency", emergency_agent)
-    graph.add_node("language", language_agent)
     graph.add_edge(START, "report_understanding")
     graph.add_edge("report_understanding", "memory")
-    graph.add_edge("memory", "doctor_brief")
-    graph.add_edge("memory", "emergency")
-    graph.add_edge("memory", "language")
-    graph.add_edge("doctor_brief", END)
-    graph.add_edge("emergency", END)
-    graph.add_edge("language", END)
+    graph.add_edge("memory", END)
     return graph.compile()
 
 
-smriti_graph = build_graph()
+def build_output_graph(node_name: str, node):
+    graph = StateGraph(SmritiState)
+    graph.add_node(node_name, node)
+    graph.add_edge(START, node_name)
+    graph.add_edge(node_name, END)
+    return graph.compile()
 
+
+smriti_ingestion_graph = build_ingestion_graph()
+doctor_brief_graph = build_output_graph("doctor_brief", doctor_brief_agent)
+emergency_graph = build_output_graph("emergency", emergency_agent)
+language_graph = build_output_graph("language", language_agent)

@@ -23,3 +23,15 @@ if uploaded and st.button("Process report"):
     else:
         st.error(f"Backend error ({response.status_code}): {response.text}")
 
+st.divider()
+st.subheader("On-demand outputs")
+if st.button("Generate doctor brief"):
+    response = requests.post(f"{API_URL}/brief", timeout=60)
+    st.json(response.json())
+if st.button("Generate emergency card"):
+    response = requests.post(f"{API_URL}/emergency", timeout=60)
+    st.json(response.json())
+language = st.selectbox("Translation language", ["en", "hi", "kn"])
+if st.button("Translate"):
+    response = requests.post(f"{API_URL}/translate", params={"language": language}, timeout=60)
+    st.json(response.json())
