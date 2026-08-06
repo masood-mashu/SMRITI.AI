@@ -33,7 +33,7 @@ def init_db() -> None:
 def session_scope() -> Iterator[Session]:
     """Provide a transaction-scoped session for graph nodes and services."""
     init_db()
-    with Session(engine) as session:
+    with Session(engine, expire_on_commit=False) as session:
         try:
             yield session
             session.commit()

@@ -126,3 +126,13 @@ def get_patient_contradictions(session: Session, patient_id: UUID) -> list[Contr
             ).order_by(Contradiction.detected_at)
         )
     )
+
+
+def get_fact_timeline(session: Session, patient_id: UUID) -> list[HealthFact]:
+    return list(
+        session.exec(
+            select(HealthFact).where(
+                HealthFact.patient_id == patient_id,
+            ).order_by(HealthFact.effective_date, HealthFact.recorded_at)
+        )
+    )

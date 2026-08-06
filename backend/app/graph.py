@@ -5,6 +5,7 @@ from typing import Any, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from .db import session_scope
+from .extractor import extract_report
 from .repositories import (
     get_current_facts,
     get_emergency_facts,
@@ -23,6 +24,7 @@ class SmritiState(TypedDict, total=False):
     extracted_facts: list[dict[str, Any]]
     memory_updated: bool
     report_id: str
+    use_fixture: bool
     persisted_fact_ids: list[str]
     contradiction_ids: list[str]
     current_facts: list[dict[str, Any]]
@@ -35,8 +37,15 @@ class SmritiState(TypedDict, total=False):
 
 
 def report_understanding_agent(state: SmritiState) -> dict[str, Any]:
-    """Stub: multimodal extraction and plain-language explanation."""
-    return {"extracted_facts": [], "explanation": f"Report understanding stub received {state.get('filename', 'file')}"}
+    """Development extractor boundary; Gemini will replace this implementation."""
+    extraction = extract_report(
+        filename=state.get("filename", "file"),
+        use_fixture=state.get("use_fixture", False),
+    )
+    return {
+        "extracted_facts": extraction["facts"],
+        "explanation": extraction["explanation"],
+    }
 
 
 def memory_agent(state: SmritiState) -> dict[str, Any]:

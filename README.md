@@ -12,7 +12,7 @@ uvicorn backend.app.main:app --reload --port 8000
 streamlit run frontend/streamlit_app.py
 ```
 
-The upload endpoint is available at `POST /reports` and runs only the Report Understanding -> Memory ingestion path. On-demand stub endpoints are available at `POST /brief`, `POST /emergency`, and `POST /translate?language=hi`. No Gemini calls, streaming, or persistence logic is implemented yet.
+The upload endpoint is available at `POST /reports` and runs only the Report Understanding -> Memory ingestion path. Use `POST /reports?fixture=true` for the opt-in synthetic development profile; real uploads currently remain extraction stubs. The timeline is available at `GET /timeline`. On-demand stub endpoints are available at `POST /brief`, `POST /emergency`, and `POST /translate?language=hi`.
 
 ## Structure
 
@@ -24,4 +24,3 @@ The upload endpoint is available at `POST /reports` and runs only the Report Und
 - `architecture/2nd arc/` - canonical architecture JSON and rendered diagram.
 
 The canonical architecture separates report ingestion from on-demand Doctor Brief, Emergency, and Language outputs while retaining the five-agent LangGraph design.
-

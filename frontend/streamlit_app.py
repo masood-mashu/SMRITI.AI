@@ -10,11 +10,13 @@ st.title("Smriti")
 st.caption("Never repeat your medical history again.")
 
 uploaded = st.file_uploader("Upload a medical report", type=["pdf", "png", "jpg", "jpeg"])
+use_fixture = st.checkbox("Use synthetic development fixture", help="Opt in to sample facts until Gemini extraction is connected.")
 if uploaded and st.button("Process report"):
     with st.spinner("Sending report to Smriti…"):
         response = requests.post(
             f"{API_URL}/reports",
             files={"file": (uploaded.name, uploaded.getvalue(), uploaded.type)},
+            params={"fixture": use_fixture},
             timeout=60,
         )
     if response.ok:
@@ -22,6 +24,10 @@ if uploaded and st.button("Process report"):
         st.json(response.json())
     else:
         st.error(f"Backend error ({response.status_code}): {response.text}")
+
+if st.button("Refresh timeline"):
+    response = requests.get(f"{API_URL}/timeline", timeout=30)
+    st.json(response.json())
 
 st.divider()
 st.subheader("On-demand outputs")
