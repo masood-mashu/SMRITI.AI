@@ -31,6 +31,8 @@ Real uploads use the Gemini provider stub by default and do not produce facts. S
 
 Set `OUTPUT_PROVIDER=vertex` to opt into Vertex-backed Doctor Brief, Emergency Card, and Language generation. The output model IDs are configurable with `DOCTOR_BRIEF_MODEL`, `EMERGENCY_MODEL`, and `LANGUAGE_MODEL`; the deterministic outputs remain the default when billing or credentials are unavailable.
 
+Phase 5 integration boundaries are available behind configuration: `PROMPT_PROVIDER=local` uses the local prompt registry, `PROMPT_PROVIDER=ai_studio` is reserved for the AI Studio registry client, `MCPContextGateway` exposes MCP-shaped context tools, `adk_tools.py` contains ADK-compatible memory tools, and `AUDIT_SINK=bigquery` enables the BigQuery audit sink. These cloud integrations are explicit and fail closed when credentials or services are missing; no live MCP server, ADK runtime, AI Studio registry, or Antigravity service is claimed by the local default.
+
 Security is opt-in for local development. Set `AUTH_ENABLED=true` and `SMRITI_API_TOKEN` to require a bearer token; `RATE_LIMIT_PER_MINUTE` controls the per-process limiter. Request IDs, latency, and route metadata are logged without report content, and OpenTelemetry spans activate when an SDK/exporter is configured.
 
 To explicitly test Vertex extraction against one local report, configure Application Default Credentials and run `python scripts/vertex_smoke.py path/to/report.pdf`.

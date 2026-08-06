@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 from .db import session_scope
 from .extractor import get_extractor
 from .generation import get_vertex_generator
+from .integrations import get_prompt_registry
 from .privacy import get_pii_scrubber
 from .repositories import (
     get_current_facts,
@@ -106,9 +107,7 @@ def doctor_brief_agent(state: SmritiState) -> dict[str, str]:
     )
     if generator is not None:
         result = generator.generate(prompt=(
-            "Create a concise clinician-facing summary from the following patient-owned memory. "
-            "Only organize recorded facts, explicitly call out contradictions for review, and do not "
-            "diagnose or recommend treatment.\n\n" + context
+            get_prompt_registry().get("doctor_brief").format(context=context)
         ))
         return {"doctor_brief": result.text, "doctor_brief_provider": result.provider}
     return {"doctor_brief": context, "doctor_brief_provider": "deterministic"}
@@ -128,8 +127,7 @@ def emergency_agent(state: SmritiState) -> dict[str, str]:
     )
     if generator is not None:
         result = generator.generate(prompt=(
-            "Format the following emergency-relevant health facts as a compact information card. "
-            "Do not diagnose, infer, or recommend treatment. If there are no facts, say so clearly.\n\n" + card
+            get_prompt_registry().get("emergency_card").format(context=card)
         ))
         return {"emergency_card": result.text, "emergency_card_provider": result.provider}
     return {"emergency_card": card, "emergency_card_provider": "deterministic"}
@@ -149,9 +147,10 @@ def language_agent(state: SmritiState) -> dict[str, str]:
     )
     if generator is not None:
         result = generator.generate(prompt=(
-            f"Translate the following patient-owned health summary into {language}. "
-            "Preserve facts exactly, use plain language, and do not diagnose or recommend treatment.\n\n" +
-            (summary or "No facts recorded yet.")
+            get_prompt_registry().get("language").format(
+                language=language,
+                context=summary or "No facts recorded yet.",
+            )
         ))
         return {"translation": result.text, "translation_provider": result.provider}
     return {"translation": f"Language Agent stub ({language}) using {len(facts)} current fact(s).", "translation_provider": "deterministic"}

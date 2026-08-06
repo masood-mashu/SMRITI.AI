@@ -6,6 +6,8 @@ import logging
 import time
 from typing import Any, Iterator
 
+from .integrations import get_audit_sink
+
 
 logger = logging.getLogger("smriti.audit")
 _tracer = None
@@ -20,6 +22,12 @@ except ImportError:
 def audit_log(event: str, **fields: Any) -> None:
     """Emit structured metadata only; callers must not pass report contents."""
     logger.info(json.dumps({"event": event, **fields}, default=str, sort_keys=True))
+    try:
+        sink = get_audit_sink()
+        if sink is not None:
+            sink.write(event, fields)
+    except Exception as exc:
+        logger.warning("audit_sink_error=%s", exc)
 
 
 @contextmanager
