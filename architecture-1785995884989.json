@@ -1,0 +1,632 @@
+{
+  "version": "1.0",
+  "diagramId": "6527d698-510c-48c5-b35e-1b8797b94e4e",
+  "title": "Architecture Diagram",
+  "nodes": [
+    {
+      "id": "streamlit-ui",
+      "type": "frontend",
+      "label": "Streamlit UI",
+      "generic_name": "User Interface",
+      "ports": [
+        {
+          "id": "out-upload",
+          "label": "Upload Report",
+          "side": "bottom"
+        },
+        {
+          "id": "in-stream",
+          "label": "Live Stream",
+          "side": "top"
+        },
+        {
+          "id": "in",
+          "label": "Input",
+          "side": "left"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
+        },
+        {
+          "id": "left-2",
+          "label": "Left 2",
+          "side": "left"
+        },
+        {
+          "id": "left-3",
+          "label": "Left 3",
+          "side": "left"
+        },
+        {
+          "id": "left-4",
+          "side": "left",
+          "label": "Left 4"
+        }
+      ],
+      "data": {
+        "description": "Patient-facing interface for uploading reports and viewing the health timeline, doctor briefs, and emergency cards.",
+        "tech": [
+          "Streamlit",
+          "Python"
+        ],
+        "isolated": false
+      }
+    },
+    {
+      "id": "fastapi-backend",
+      "type": "api-gateway",
+      "label": "FastAPI Backend",
+      "generic_name": "Backend API",
+      "ports": [
+        {
+          "id": "in-ui",
+          "label": "API Request",
+          "side": "top"
+        },
+        {
+          "id": "out-agents",
+          "label": "Orchestrate",
+          "side": "bottom"
+        },
+        {
+          "id": "in",
+          "label": "Input",
+          "side": "left"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
+        },
+        {
+          "id": "left-2",
+          "label": "Left 2",
+          "side": "left"
+        },
+        {
+          "id": "left-3",
+          "label": "Left 3",
+          "side": "left"
+        },
+        {
+          "id": "left-4",
+          "side": "left",
+          "label": "Left 4"
+        }
+      ],
+      "data": {
+        "description": "Orchestrates the multi-agent workflow using LangGraph and serves the API for the frontend.",
+        "tech": [
+          "FastAPI",
+          "Python",
+          "LangGraph"
+        ],
+        "isolated": false
+      }
+    },
+    {
+      "id": "report-understanding-agent",
+      "type": "service",
+      "label": "Report Understanding Agent",
+      "generic_name": "Extraction Agent",
+      "ports": [
+        {
+          "id": "in",
+          "label": "Ingest Report",
+          "side": "left"
+        },
+        {
+          "id": "out-memory",
+          "label": "Structured Data",
+          "side": "right"
+        },
+        {
+          "id": "out-stream",
+          "label": "Explanation Stream",
+          "side": "top"
+        },
+        {
+          "id": "right-2",
+          "side": "right",
+          "label": "Right 2"
+        }
+      ],
+      "data": {
+        "description": "Extracts structured medical facts from images/PDFs using multimodal reasoning.",
+        "tech": [
+          "Python",
+          "Gemini 3.1 Pro (Native Multimodal)",
+          "LangGraph"
+        ]
+      }
+    },
+    {
+      "id": "memory-agent",
+      "type": "service",
+      "label": "Memory Agent",
+      "generic_name": "Memory Orchestrator",
+      "ports": [
+        {
+          "id": "in-data",
+          "label": "New Facts",
+          "side": "left"
+        },
+        {
+          "id": "out-db",
+          "label": "Merge/Store",
+          "side": "bottom"
+        },
+        {
+          "id": "out-agents",
+          "label": "Fan-out State",
+          "side": "right"
+        },
+        {
+          "id": "right-2",
+          "label": "Right 2",
+          "side": "right"
+        },
+        {
+          "id": "right-3",
+          "label": "Right 3",
+          "side": "right"
+        },
+        {
+          "id": "right-4",
+          "label": "Right 4",
+          "side": "right"
+        },
+        {
+          "id": "right-5",
+          "side": "right",
+          "label": "Right 5"
+        }
+      ],
+      "data": {
+        "tech": [
+          "Python",
+          "LangGraph",
+          "SQLModel"
+        ]
+      }
+    },
+    {
+      "id": "doctor-brief-agent",
+      "type": "service",
+      "label": "Doctor Brief Agent",
+      "generic_name": "Clinical Summarizer",
+      "ports": [
+        {
+          "id": "in",
+          "label": "Memory State",
+          "side": "left"
+        },
+        {
+          "id": "out-vector",
+          "label": "History Lookup",
+          "side": "bottom"
+        },
+        {
+          "id": "out-ui",
+          "label": "Brief Stream",
+          "side": "top"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
+        },
+        {
+          "id": "right-2",
+          "label": "Right 2",
+          "side": "right"
+        },
+        {
+          "id": "right-3",
+          "side": "right",
+          "label": "Right 3"
+        }
+      ],
+      "data": {
+        "tech": [
+          "Python",
+          "Gemini 3.5 Flash",
+          "LangGraph"
+        ]
+      }
+    },
+    {
+      "id": "emergency-agent",
+      "type": "service",
+      "label": "Emergency Agent",
+      "generic_name": "Emergency Profiler",
+      "ports": [
+        {
+          "id": "in",
+          "label": "Memory State",
+          "side": "left"
+        },
+        {
+          "id": "out-db",
+          "label": "Structured Lookup",
+          "side": "bottom"
+        },
+        {
+          "id": "out-ui",
+          "label": "Card Stream",
+          "side": "top"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
+        },
+        {
+          "id": "right-2",
+          "label": "Right 2",
+          "side": "right"
+        },
+        {
+          "id": "right-3",
+          "side": "right",
+          "label": "Right 3"
+        }
+      ],
+      "data": {
+        "tech": [
+          "Python",
+          "Gemini 3.5 Flash-Lite",
+          "LangGraph"
+        ]
+      }
+    },
+    {
+      "id": "language-agent",
+      "type": "service",
+      "label": "Language Agent",
+      "generic_name": "Translation Agent",
+      "ports": [
+        {
+          "id": "in",
+          "label": "Memory State",
+          "side": "left"
+        },
+        {
+          "id": "out-ui",
+          "label": "Translation Stream",
+          "side": "top"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
+        },
+        {
+          "id": "right-2",
+          "side": "right",
+          "label": "Right 2"
+        }
+      ],
+      "data": {
+        "tech": [
+          "Python",
+          "Gemini 3.5 Flash",
+          "LangGraph"
+        ]
+      }
+    },
+    {
+      "id": "health-profile-db",
+      "type": "database",
+      "label": "Health Profile DB (Postgres)",
+      "generic_name": "Relational Database",
+      "ports": [
+        {
+          "id": "in",
+          "label": "in",
+          "side": "left"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
+        },
+        {
+          "id": "left-2",
+          "side": "left",
+          "label": "Left 2"
+        }
+      ],
+      "data": {
+        "tech": [
+          "Postgres (Cloud SQL)",
+          "SQLModel"
+        ]
+      }
+    },
+    {
+      "id": "report-vector-store-db",
+      "type": "database",
+      "label": "Vertex AI Vector Search",
+      "generic_name": "Vector Database",
+      "ports": [
+        {
+          "id": "in",
+          "label": "in",
+          "side": "left"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
+        },
+        {
+          "id": "left-2",
+          "side": "left",
+          "label": "Left 2"
+        }
+      ],
+      "data": {
+        "tech": [
+          "Vertex AI Vector Search",
+          "Google Cloud Storage"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "ui-to-backend",
+      "source": {
+        "nodeId": "streamlit-ui",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "fastapi-backend",
+        "portId": "in"
+      },
+      "type": "http",
+      "label": "Upload & Request"
+    },
+    {
+      "id": "backend-to-understanding",
+      "source": {
+        "nodeId": "fastapi-backend",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "report-understanding-agent",
+        "portId": "in"
+      },
+      "type": "internal-api",
+      "label": "Process Report"
+    },
+    {
+      "id": "understanding-to-memory",
+      "source": {
+        "nodeId": "report-understanding-agent",
+        "portId": "out-memory"
+      },
+      "target": {
+        "nodeId": "memory-agent",
+        "portId": "in-data"
+      },
+      "type": "internal-api",
+      "label": "Merge Facts"
+    },
+    {
+      "id": "memory-to-db",
+      "source": {
+        "nodeId": "memory-agent",
+        "portId": "out-agents"
+      },
+      "target": {
+        "nodeId": "health-profile-db",
+        "portId": "in"
+      },
+      "type": "database",
+      "label": "Persistent Storage"
+    },
+    {
+      "id": "memory-to-vector-db",
+      "source": {
+        "nodeId": "memory-agent",
+        "portId": "right-2"
+      },
+      "target": {
+        "nodeId": "report-vector-store-db",
+        "portId": "in"
+      },
+      "type": "database",
+      "label": "Vector Search"
+    },
+    {
+      "id": "memory-to-doctor",
+      "source": {
+        "nodeId": "memory-agent",
+        "portId": "right-3"
+      },
+      "target": {
+        "nodeId": "doctor-brief-agent",
+        "portId": "in"
+      },
+      "type": "internal-api",
+      "label": "Trigger Brief"
+    },
+    {
+      "id": "memory-to-emergency",
+      "source": {
+        "nodeId": "memory-agent",
+        "portId": "right-4"
+      },
+      "target": {
+        "nodeId": "emergency-agent",
+        "portId": "in"
+      },
+      "type": "internal-api",
+      "label": "Trigger Card"
+    },
+    {
+      "id": "memory-to-language",
+      "source": {
+        "nodeId": "memory-agent",
+        "portId": "right-5"
+      },
+      "target": {
+        "nodeId": "language-agent",
+        "portId": "in"
+      },
+      "type": "internal-api",
+      "label": "Trigger Translation"
+    },
+    {
+      "id": "doctor-brief-to-backend",
+      "source": {
+        "nodeId": "doctor-brief-agent",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "fastapi-backend",
+        "portId": "left-2"
+      },
+      "type": "internal-api",
+      "label": "Return Brief"
+    },
+    {
+      "id": "emergency-to-backend",
+      "source": {
+        "nodeId": "emergency-agent",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "fastapi-backend",
+        "portId": "left-3"
+      },
+      "type": "internal-api",
+      "label": "Return Card"
+    },
+    {
+      "id": "language-to-backend",
+      "source": {
+        "nodeId": "language-agent",
+        "portId": "out"
+      },
+      "target": {
+        "nodeId": "fastapi-backend",
+        "portId": "left-4"
+      },
+      "type": "internal-api",
+      "label": "Return Translation"
+    },
+    {
+      "id": "doctor-to-vector-search",
+      "source": {
+        "nodeId": "doctor-brief-agent",
+        "portId": "right-2"
+      },
+      "target": {
+        "nodeId": "report-vector-store-db",
+        "portId": "left-2"
+      },
+      "type": "database",
+      "label": "History Lookup (Vector Search)"
+    },
+    {
+      "id": "emergency-to-structured-db",
+      "source": {
+        "nodeId": "emergency-agent",
+        "portId": "right-2"
+      },
+      "target": {
+        "nodeId": "health-profile-db",
+        "portId": "left-2"
+      },
+      "type": "database",
+      "label": "Structured Lookup"
+    },
+    {
+      "id": "understanding-to-ui-stream",
+      "source": {
+        "nodeId": "report-understanding-agent",
+        "portId": "right-2"
+      },
+      "target": {
+        "nodeId": "streamlit-ui",
+        "portId": "in"
+      },
+      "type": "websocket",
+      "label": "Return Explanation (Streaming)"
+    },
+    {
+      "id": "doctor-to-ui-stream",
+      "source": {
+        "nodeId": "doctor-brief-agent",
+        "portId": "right-3"
+      },
+      "target": {
+        "nodeId": "streamlit-ui",
+        "portId": "left-2"
+      },
+      "type": "websocket",
+      "label": "Brief Stream"
+    },
+    {
+      "id": "emergency-to-ui-stream",
+      "source": {
+        "nodeId": "emergency-agent",
+        "portId": "right-3"
+      },
+      "target": {
+        "nodeId": "streamlit-ui",
+        "portId": "left-3"
+      },
+      "type": "websocket",
+      "label": "Card Stream"
+    },
+    {
+      "id": "language-to-ui-stream",
+      "source": {
+        "nodeId": "language-agent",
+        "portId": "right-2"
+      },
+      "target": {
+        "nodeId": "streamlit-ui",
+        "portId": "left-4"
+      },
+      "type": "websocket",
+      "label": "Translation Stream"
+    }
+  ],
+  "groups": [
+    {
+      "children": [
+        "streamlit-ui",
+        "fastapi-backend"
+      ],
+      "id": "app-layer",
+      "label": "Application Layer (Cloud Run)"
+    },
+    {
+      "children": [
+        "report-understanding-agent",
+        "memory-agent",
+        "doctor-brief-agent",
+        "emergency-agent",
+        "language-agent"
+      ],
+      "id": "agent-swarm",
+      "label": "AI Agent Swarm (LangGraph)"
+    },
+    {
+      "children": [
+        "health-profile-db",
+        "report-vector-store-db"
+      ],
+      "id": "data-persistence",
+      "label": "Data Persistence (GCP Managed)"
+    }
+  ],
+  "metadata": {}
+}
