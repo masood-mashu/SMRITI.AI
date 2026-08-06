@@ -1,4 +1,11 @@
-from backend.app.extractor import FixtureExtractor, GeminiExtractorStub, VertexGeminiExtractor
+import pytest
+
+from backend.app.extractor import (
+    ExtractionError,
+    FixtureExtractor,
+    GeminiExtractorStub,
+    VertexGeminiExtractor,
+)
 from backend.app.privacy import GemmaPiiScrubber, RegexPiiScrubber
 
 
@@ -53,3 +60,22 @@ def test_vertex_gemini_adapter_parses_structured_response() -> None:
     )
     assert result.provider == "vertex-gemini"
     assert result.facts[0]["effective_date"].isoformat() == "2026-01-15"
+
+
+def test_vertex_gemini_adapter_rejects_unsafe_fact_shape() -> None:
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            class Response:
+                text = '{"facts":[{"fact_type":"diagnosis","fact_key":"x","fact_value":"y","effective_date":"2026-01-15"}]}'
+
+            return Response()
+
+    class FakeClient:
+        models = FakeModels()
+
+    with pytest.raises(ExtractionError, match="invalid extraction JSON"):
+        VertexGeminiExtractor(client=FakeClient()).extract(
+            filename="report.pdf",
+            content_type="application/pdf",
+            content=b"pdf-bytes",
+        )

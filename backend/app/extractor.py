@@ -8,7 +8,9 @@ from dataclasses import dataclass
 from datetime import date
 import json
 import os
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
+
+from pydantic import BaseModel, Field, ValidationError
 
 
 @dataclass(frozen=True)
@@ -16,6 +18,33 @@ class ExtractionResult:
     facts: list[dict[str, Any]]
     explanation: str
     provider: str
+
+
+class ExtractionError(RuntimeError):
+    """Raised when a provider response cannot be trusted as structured data."""
+
+
+class ExtractedFact(BaseModel):
+    fact_type: Literal[
+        "condition",
+        "medication",
+        "allergy",
+        "lab_value",
+        "procedure",
+        "vaccination",
+    ]
+    fact_key: str = Field(min_length=1)
+    fact_value: str = Field(min_length=1)
+    unit: str | None = None
+    status: Literal["active", "resolved", "discontinued"] = "active"
+    is_emergency_relevant: bool = False
+    effective_date: date
+    confidence: float | None = Field(default=None, ge=0, le=1)
+
+
+class ExtractionPayload(BaseModel):
+    facts: list[ExtractedFact] = Field(default_factory=list)
+    explanation: str = ""
 
 
 class ReportExtractor(Protocol):
@@ -135,15 +164,17 @@ treatment, or infer missing information. Return JSON with this exact shape:
     def _parse_response(self, text: str) -> ExtractionResult:
         cleaned = text.strip()
         if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-        payload = json.loads(cleaned)
-        facts = payload.get("facts", [])
-        for fact in facts:
-            if isinstance(fact.get("effective_date"), str):
-                fact["effective_date"] = date.fromisoformat(fact["effective_date"])
+            try:
+                cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+            except IndexError as exc:
+                raise ExtractionError("Gemini returned an invalid markdown response") from exc
+        try:
+            payload = ExtractionPayload.model_validate_json(cleaned)
+        except (ValidationError, ValueError) as exc:
+            raise ExtractionError(f"Gemini returned invalid extraction JSON: {exc}") from exc
         return ExtractionResult(
-            facts=facts,
-            explanation=str(payload.get("explanation", "")),
+            facts=[fact.model_dump() for fact in payload.facts],
+            explanation=payload.explanation,
             provider="vertex-gemini",
         )
 

@@ -28,3 +28,5 @@ The upload endpoint is available at `POST /reports` and runs only the Report Und
 The canonical architecture separates report ingestion from on-demand Doctor Brief, Emergency, and Language outputs while retaining the five-agent LangGraph design.
 
 Real uploads use the Gemini provider stub by default and do not produce facts. Set `EXTRACTION_PROVIDER=vertex` and configure Google Cloud credentials to enable the Vertex Gemini adapter. The synthetic fixture is opt-in with `fixture=true`; it is intended only for local development.
+
+To explicitly test Vertex extraction against one local report, configure Application Default Credentials and run `python scripts/vertex_smoke.py path/to/report.pdf`.
