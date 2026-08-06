@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import os
+import time
 from typing import Any, Protocol
 
 
@@ -55,16 +56,25 @@ class VertexTextGenerator:
             config = types.GenerateContentConfig(temperature=0.2)
         else:
             config = {"temperature": 0.2}
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=config,
-            )
-        except GenerationError:
-            raise
-        except Exception as exc:
-            raise GenerationError(f"Vertex output generation failed: {exc}") from exc
+        response = None
+        for attempt in range(3):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config=config,
+                )
+                break
+            except GenerationError:
+                raise
+            except (TimeoutError, ConnectionError) as exc:
+                if attempt == 2:
+                    raise GenerationError(f"Vertex output generation failed after retries: {exc}") from exc
+                time.sleep(0.2 * (2**attempt))
+            except Exception as exc:
+                raise GenerationError(f"Vertex output generation failed: {exc}") from exc
+        if response is None:
+            raise GenerationError("Vertex output generation returned no response")
         return GenerationResult(text=response.text.strip(), provider="vertex-gemini")
 
 

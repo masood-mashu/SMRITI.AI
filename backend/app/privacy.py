@@ -14,6 +14,10 @@ class ScrubResult:
     provider: str
 
 
+class PrivacyPolicyError(RuntimeError):
+    """Raised when configured privacy policy cannot safely process an upload."""
+
+
 class PiiScrubber(Protocol):
     def scrub(self, *, content: bytes, filename: str, content_type: str) -> ScrubResult:
         """Return content safe to pass to the report extractor."""
@@ -27,8 +31,13 @@ class RegexPiiScrubber:
         re.compile(rb"(?<!\d)(?:\+?\d[\s-]?){10,13}(?!\d)"),
     )
 
+    def __init__(self, strict: bool = False) -> None:
+        self.strict = strict
+
     def scrub(self, *, content: bytes, filename: str, content_type: str) -> ScrubResult:
         if not (content_type.startswith("text/") or filename.lower().endswith((".txt", ".csv"))):
+            if self.strict:
+                raise PrivacyPolicyError("Strict PHI mode requires a multimodal PII scrubber for this file")
             return ScrubResult(content=content, redactions=0, provider="regex-dev")
         scrubbed = content
         redactions = 0
@@ -112,10 +121,12 @@ class VertexGemmaPiiScrubber:
 
 def get_pii_scrubber() -> PiiScrubber:
     provider = os.getenv("PII_PROVIDER", "gemma_stub").lower()
+    strict_default = os.getenv("SMRITI_ENV", "development").lower() == "production"
+    strict = os.getenv("PHI_STRICT", str(strict_default)).lower() == "true"
     if provider in {"regex", "regex_dev"}:
-        return RegexPiiScrubber()
+        return RegexPiiScrubber(strict=strict)
     if provider in {"gemma_stub", "stub"}:
-        return GemmaPiiScrubber()
+        return GemmaPiiScrubber(fallback=RegexPiiScrubber(strict=strict))
     if provider in {"vertex_gemma", "gemma"}:
-        return VertexGemmaPiiScrubber()
+        return VertexGemmaPiiScrubber(fallback=RegexPiiScrubber(strict=strict))
     raise RuntimeError(f"Unsupported PII_PROVIDER: {provider}")

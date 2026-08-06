@@ -7,7 +7,7 @@ from backend.app.extractor import (
     ProviderConfigurationError,
     VertexGeminiExtractor,
 )
-from backend.app.privacy import GemmaPiiScrubber, RegexPiiScrubber, VertexGemmaPiiScrubber
+from backend.app.privacy import GemmaPiiScrubber, PrivacyPolicyError, RegexPiiScrubber, VertexGemmaPiiScrubber
 from backend.app.generation import GenerationError, VertexTextGenerator
 
 
@@ -39,6 +39,15 @@ def test_gemma_scrubber_uses_safe_text_fallback() -> None:
     assert result.redactions == 2
     assert b"patient@example.com" not in result.content
     assert b"98765" not in result.content
+
+
+def test_strict_pii_mode_rejects_unscrubbed_binary_uploads() -> None:
+    with pytest.raises(PrivacyPolicyError):
+        RegexPiiScrubber(strict=True).scrub(
+            content=b"pdf-bytes",
+            filename="report.pdf",
+            content_type="application/pdf",
+        )
 
 
 def test_vertex_gemma_scrubber_parses_redaction_response() -> None:

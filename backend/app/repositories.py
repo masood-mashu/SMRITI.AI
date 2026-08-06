@@ -3,7 +3,7 @@
 from datetime import date
 import json
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlmodel import Session, select
 
@@ -62,6 +62,7 @@ def persist_report_and_facts(
             continue
 
         fact = HealthFact(
+            fact_id=uuid4(),
             patient_id=patient_id,
             report_id=report.report_id,
             fact_type=str(payload["fact_type"]),
@@ -73,11 +74,15 @@ def persist_report_and_facts(
             effective_date=payload.get("effective_date", date.today()),
             confidence=payload.get("confidence"),
         )
+        if current is not None:
+            # Close the current row before inserting its replacement so the
+            # unique partial index is satisfied throughout the transaction.
+            current.superseded_by = fact.fact_id
+            session.flush()
         session.add(fact)
         session.flush()
 
         if current is not None:
-            current.superseded_by = fact.fact_id
             contradiction = Contradiction(
                 patient_id=patient_id,
                 fact_id_older=current.fact_id,

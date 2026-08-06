@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from uuid import UUID
 from pathlib import Path
 from typing import Literal
+import os
 import time
 from uuid import uuid4
 
@@ -21,7 +22,7 @@ from .repositories import get_fact_timeline, get_patient_contradictions
 from .models import HealthFact
 from .storage import StorageError, get_storage
 from .observability import audit_log, trace_span
-from .security import require_security
+from .security import enforce_patient_access, require_security
 from .mcp_server import router as mcp_router
 
 @asynccontextmanager
@@ -47,18 +48,23 @@ async def generation_error_handler(request: Request, exc: GenerationError) -> JS
 async def request_observability(request: Request, call_next):
     request_id = str(uuid4())
     started = time.perf_counter()
-    with trace_span("http.request", method=request.method, path=request.url.path):
-        response = await call_next(request)
-    response.headers["X-Request-ID"] = request_id
-    audit_log(
-        "http_request",
-        request_id=request_id,
-        method=request.method,
-        path=request.url.path,
-        status_code=response.status_code,
-        duration_ms=round((time.perf_counter() - started) * 1000, 2),
-    )
-    return response
+    response = None
+    status_code = 500
+    try:
+        with trace_span("http.request", method=request.method, path=request.url.path):
+            response = await call_next(request)
+        status_code = response.status_code
+        response.headers["X-Request-ID"] = request_id
+        return response
+    finally:
+        audit_log(
+            "http_request",
+            request_id=request_id,
+            method=request.method,
+            path=request.url.path,
+            status_code=status_code,
+            duration_ms=round((time.perf_counter() - started) * 1000, 2),
+        )
 
 
 def resolve_patient_id(patient_id: UUID | None, request: Request | None = None) -> str:
@@ -69,7 +75,11 @@ def resolve_patient_id(patient_id: UUID | None, request: Request | None = None) 
         if patient_id is not None and str(patient_id) != auth.patient_id:
             raise HTTPException(status_code=403, detail="Patient access denied")
         return auth.patient_id
-    return str(patient_id or DEFAULT_PATIENT_ID)
+    if patient_id is not None:
+        return enforce_patient_access(request, str(patient_id)) if request is not None else str(patient_id)
+    if os.getenv("SMRITI_ENV", "development").lower() not in {"development", "test"}:
+        raise HTTPException(status_code=400, detail="patient_id is required")
+    return str(DEFAULT_PATIENT_ID)
 
 
 def validate_upload(*, filename: str, content_type: str, content: bytes) -> None:
@@ -77,7 +87,17 @@ def validate_upload(*, filename: str, content_type: str, content: bytes) -> None
         raise HTTPException(status_code=400, detail="Uploaded report is empty")
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Uploaded report exceeds the 10 MB limit")
-    if content_type not in ALLOWED_CONTENT_TYPES and Path(filename).suffix.lower() not in ALLOWED_SUFFIXES:
+    suffix = Path(filename).suffix.lower()
+    expected_types = {
+        ".pdf": "application/pdf",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".txt": "text/plain",
+    }
+    if suffix not in ALLOWED_SUFFIXES or content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail="Unsupported report type")
+    if expected_types[suffix] != content_type:
         raise HTTPException(status_code=415, detail="Unsupported report type")
 
 

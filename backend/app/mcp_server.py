@@ -8,12 +8,10 @@ can be added later without changing the tool contracts.
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends
-from sqlmodel import Session
-
+from fastapi import APIRouter, Depends, Request
 from .db import session_scope
 from .integrations import MCPContextGateway
-from .security import require_security
+from .security import enforce_patient_access, require_security
 
 
 router = APIRouter(prefix="/mcp", tags=["mcp"], dependencies=[Depends(require_security)])
@@ -58,7 +56,7 @@ def rpc_error(request_id: Any, code: int, message: str) -> dict[str, Any]:
 
 
 @router.post("")
-def mcp_json_rpc(payload: dict[str, Any]) -> dict[str, Any]:
+def mcp_json_rpc(request: Request, payload: dict[str, Any]) -> dict[str, Any]:
     request_id = payload.get("id")
     method = payload.get("method")
     params = payload.get("params") or {}
@@ -85,6 +83,11 @@ def mcp_json_rpc(payload: dict[str, Any]) -> dict[str, Any]:
     arguments = params.get("arguments") or {}
     if name not in {tool["name"] for tool in TOOLS}:
         return rpc_error(request_id, -32602, f"Unknown tool: {name}")
+    try:
+        arguments = dict(arguments)
+        arguments["patient_id"] = enforce_patient_access(request, str(arguments["patient_id"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        return rpc_error(request_id, -32602, f"Invalid tool arguments: {exc}")
     try:
         with session_scope() as session:
             result = MCPContextGateway(session).call_tool(name, arguments)

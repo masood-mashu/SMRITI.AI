@@ -2,8 +2,11 @@
 
 from pathlib import Path
 import os
+import time
 from typing import Protocol
 from uuid import uuid4
+
+from cryptography.fernet import Fernet
 
 
 class StorageError(RuntimeError):
@@ -16,15 +19,45 @@ class FileStorage(Protocol):
 
 
 class LocalFileStorage:
-    def __init__(self, root: str | Path = ".data/uploads") -> None:
+    def __init__(
+        self,
+        root: str | Path = ".data/uploads",
+        *,
+        encryption_key: str | None = None,
+        encryption_required: bool = False,
+        retention_days: int = 0,
+    ) -> None:
         self.root = Path(root)
+        self._fernet = None
+        if encryption_key:
+            try:
+                self._fernet = Fernet(encryption_key.encode())
+            except (ValueError, TypeError) as exc:
+                raise StorageError("STORAGE_ENCRYPTION_KEY must be a valid Fernet key") from exc
+        if encryption_required and self._fernet is None:
+            raise StorageError("STORAGE_ENCRYPTION_KEY is required for encrypted local storage")
+        self.retention_days = max(0, retention_days)
+        self.cleanup_expired()
 
     def store(self, *, filename: str, content: bytes, content_type: str) -> str:
         suffix = Path(filename).suffix.lower()
         key = f"{uuid4()}{suffix}"
         self.root.mkdir(parents=True, exist_ok=True)
-        (self.root / key).write_bytes(content)
+        payload = self._fernet.encrypt(content) if self._fernet else content
+        (self.root / key).write_bytes(payload)
         return f"local://{key}"
+
+    def cleanup_expired(self) -> int:
+        """Remove local files older than the configured retention window."""
+        if self.retention_days <= 0 or not self.root.exists():
+            return 0
+        cutoff = time.time() - (self.retention_days * 86400)
+        removed = 0
+        for path in self.root.iterdir():
+            if path.is_file() and path.stat().st_mtime < cutoff:
+                path.unlink()
+                removed += 1
+        return removed
 
 
 class GcsFileStorage:
@@ -48,7 +81,14 @@ class GcsFileStorage:
 def get_storage() -> FileStorage:
     provider = os.getenv("STORAGE_PROVIDER", "local").lower()
     if provider == "local":
-        return LocalFileStorage(os.getenv("LOCAL_STORAGE_DIR", ".data/uploads"))
+        production = os.getenv("SMRITI_ENV", "development").lower() == "production"
+        required = os.getenv("STORAGE_ENCRYPTION_REQUIRED", str(production)).lower() in {"1", "true", "yes", "on"}
+        return LocalFileStorage(
+            os.getenv("LOCAL_STORAGE_DIR", ".data/uploads"),
+            encryption_key=os.getenv("STORAGE_ENCRYPTION_KEY") or None,
+            encryption_required=required,
+            retention_days=int(os.getenv("STORAGE_RETENTION_DAYS", "0")),
+        )
     if provider == "gcs":
         bucket = os.getenv("GCS_BUCKET")
         if not bucket:

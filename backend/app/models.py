@@ -36,7 +36,14 @@ class Report(SQLModel, table=True):
 class HealthFact(SQLModel, table=True):
     __tablename__ = "health_facts"
     __table_args__ = (
-        Index("idx_facts_current", "patient_id", "fact_key", postgresql_where=text("superseded_by IS NULL")),
+        Index(
+            "idx_facts_current",
+            "patient_id",
+            "fact_key",
+            unique=True,
+            postgresql_where=text("superseded_by IS NULL"),
+            sqlite_where=text("superseded_by IS NULL"),
+        ),
         Index("idx_facts_timeline", "patient_id", "effective_date"),
     )
     fact_id: UUID = Field(default_factory=uuid4, primary_key=True)

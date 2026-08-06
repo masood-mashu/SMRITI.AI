@@ -82,10 +82,18 @@ OIDC_AUDIENCE=smriti-api
 OIDC_JWKS_URL=https://.../.well-known/jwks.json
 RATE_LIMIT_BACKEND=redis
 REDIS_URL=redis://...
+STORAGE_PROVIDER=local
+STORAGE_ENCRYPTION_REQUIRED=true
+STORAGE_ENCRYPTION_KEY=<base64-fernet-key>
+STORAGE_RETENTION_DAYS=30
 ```
 
 For local/demo authentication, use `AUTH_MODE=token` and
 `SMRITI_API_TOKEN`. Never commit real credentials.
+
+If local file storage is used in production, provide a Fernet key through a
+secret manager and set a retention window. GCS storage should use the bucket's
+server-side encryption and lifecycle policies.
 
 ## Optional integrations
 
@@ -123,11 +131,16 @@ Run the full local suite:
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m pip_audit
+.\.venv\Scripts\python.exe -m bandit -r backend -ll
+.\.venv\Scripts\python.exe -m ruff check backend frontend tests
 ```
 
 The suite covers schema persistence, append-only supersession, security,
 patient isolation, MCP, provider adapters, and the complete fixture flow.
-GitHub Actions also runs dependency checks, tests, and a container build.
+`requirements.lock` pins the verified development environment, and GitHub
+Actions installs it before running dependency checks, tests, and a container
+build.
 
 ## Safety and current limits
 

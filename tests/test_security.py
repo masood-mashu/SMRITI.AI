@@ -5,6 +5,7 @@ from backend.app.security import AuthContext, rate_limiter
 
 
 def test_protected_routes_require_bearer_when_enabled(monkeypatch) -> None:
+    rate_limiter._events.clear()
     monkeypatch.setenv("AUTH_ENABLED", "true")
     monkeypatch.setenv("SMRITI_API_TOKEN", "test-token")
     monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "60")
@@ -26,6 +27,7 @@ def test_rate_limit_is_enforced_per_client(monkeypatch) -> None:
 
 
 def test_oidc_context_is_restricted_to_claimed_patient(monkeypatch) -> None:
+    rate_limiter._events.clear()
     patient_id = "11111111-1111-1111-1111-111111111111"
     monkeypatch.setenv("AUTH_ENABLED", "true")
     monkeypatch.setenv("AUTH_MODE", "oidc")

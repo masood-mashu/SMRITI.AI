@@ -1,7 +1,6 @@
 """Database engine and session helpers for Smriti."""
 
 from contextlib import contextmanager
-import os
 from collections.abc import Iterator
 
 from sqlalchemy import text

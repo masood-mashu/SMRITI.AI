@@ -44,7 +44,7 @@ def upgrade() -> None:
         sa.Column("superseded_by", postgresql.UUID(as_uuid=True), sa.ForeignKey("health_facts.fact_id")),
         sa.Column("confidence", sa.REAL()),
     )
-    op.create_index("idx_facts_current", "health_facts", ["patient_id", "fact_key"], postgresql_where=sa.text("superseded_by IS NULL"))
+    op.create_index("idx_facts_current", "health_facts", ["patient_id", "fact_key"], unique=True, postgresql_where=sa.text("superseded_by IS NULL"))
     op.create_index("idx_facts_timeline", "health_facts", ["patient_id", "effective_date"])
     op.create_table(
         "contradictions",

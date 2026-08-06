@@ -3,7 +3,6 @@
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from hmac import compare_digest
-import os
 import threading
 import time
 from typing import Any
@@ -69,6 +68,21 @@ _redis_limiters: dict[str, RedisRateLimiter] = {}
 _oidc_clients: dict[str, Any] = {}
 
 
+def enforce_patient_access(request: Request, patient_id: str) -> str:
+    """Validate a requested patient UUID against the authenticated identity."""
+    try:
+        normalized = str(UUID(patient_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Invalid patient_id") from exc
+    auth = getattr(request.state, "auth", None)
+    if auth is not None and auth.mode == "oidc":
+        if not auth.patient_id:
+            raise HTTPException(status_code=403, detail="Token is not associated with a patient")
+        if normalized != auth.patient_id:
+            raise HTTPException(status_code=403, detail="Patient access denied")
+    return normalized
+
+
 def _oidc_context(token: str, settings: Settings) -> AuthContext:
     if not settings.oidc_issuer or not settings.oidc_audience:
         raise HTTPException(status_code=503, detail="OIDC authentication is not configured")
@@ -114,11 +128,13 @@ def require_security(
         limiter = _redis_limiters.setdefault(settings.redis_url, RedisRateLimiter(settings.redis_url))
     else:
         limiter = rate_limiter
-    limiter.check(client_key, settings.rate_limit_per_minute)
-
     if not settings.auth_enabled:
         request.state.auth = None
+        limiter.check(f"ip:{client_key}", settings.rate_limit_per_minute)
         return
+    # Keep unauthenticated and invalid-token attempts bounded by source IP.
+    # Successful requests receive the stronger subject-scoped limit below.
+    limiter.check(f"ip:{client_key}", min(settings.rate_limit_per_minute, 10))
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Bearer authentication required")
 
@@ -131,3 +147,4 @@ def require_security(
             raise HTTPException(status_code=401, detail="Invalid bearer token")
         context = AuthContext(subject="static-token", patient_id=None, mode="token")
     request.state.auth = context
+    limiter.check(f"subject:{context.subject}", settings.rate_limit_per_minute)

@@ -1,4 +1,5 @@
 import os
+import time
 from uuid import uuid4
 
 import requests
@@ -7,6 +8,7 @@ import streamlit as st
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("SMRITI_API_TOKEN")
+API_TIMEOUT = float(os.getenv("API_TIMEOUT_SECONDS", "60"))
 SOURCE_TYPES = {
     "Other": "other",
     "Lab result": "lab_result",
@@ -23,7 +25,15 @@ def request_json(method: str, path: str, **kwargs) -> dict:
     headers = dict(kwargs.pop("headers", {}))
     if API_TOKEN:
         headers["Authorization"] = f"Bearer {API_TOKEN}"
-    response = requests.request(method, f"{API_URL}{path}", headers=headers, timeout=60, **kwargs)
+    attempts = 2 if method.upper() == "GET" else 1
+    for attempt in range(attempts):
+        try:
+            response = requests.request(method, f"{API_URL}{path}", headers=headers, timeout=API_TIMEOUT, **kwargs)
+            break
+        except requests.RequestException as exc:
+            if attempt + 1 == attempts:
+                raise RuntimeError(f"Backend unavailable: {exc}") from exc
+            time.sleep(0.25)
     if not response.ok:
         raise RuntimeError(f"Backend error ({response.status_code}): {response.text}")
     return response.json()

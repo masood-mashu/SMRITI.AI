@@ -6,8 +6,8 @@ contract here lets the graph and tests remain independent of an LLM SDK.
 
 from dataclasses import dataclass
 from datetime import date
-import json
 import os
+import time
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field, ValidationError
@@ -158,16 +158,25 @@ treatment, or infer missing information. Return JSON with this exact shape:
             file_part = {"data": content, "mime_type": content_type}
             config = {"response_mime_type": "application/json", "temperature": 0}
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=[prompt, file_part],
-                config=config,
-            )
-        except ProviderConfigurationError:
-            raise
-        except Exception as exc:
-            raise ExtractionError(f"Vertex Gemini request failed: {exc}") from exc
+        response = None
+        for attempt in range(3):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=[prompt, file_part],
+                    config=config,
+                )
+                break
+            except ProviderConfigurationError:
+                raise
+            except (TimeoutError, ConnectionError) as exc:
+                if attempt == 2:
+                    raise ExtractionError(f"Vertex Gemini request failed after retries: {exc}") from exc
+                time.sleep(0.2 * (2**attempt))
+            except Exception as exc:
+                raise ExtractionError(f"Vertex Gemini request failed: {exc}") from exc
+        if response is None:
+            raise ExtractionError("Vertex Gemini request returned no response")
         return self._parse_response(response.text)
 
     def _parse_response(self, text: str) -> ExtractionResult:

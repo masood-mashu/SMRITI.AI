@@ -6,6 +6,8 @@ and fail explicitly rather than silently pretending to be connected.
 
 from datetime import datetime, timezone
 import os
+import time
+from functools import lru_cache
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -64,18 +66,23 @@ class AIStudioPromptRegistry:
 
     def get(self, name: str) -> str:
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
-        try:
-            response = requests.get(f"{self.base_url}/prompts/{name}", headers=headers, timeout=self.timeout)
-            response.raise_for_status()
-            payload = response.json()
-            prompt = payload.get("prompt") or payload.get("template")
-            if not isinstance(prompt, str) or not prompt:
-                raise IntegrationNotConfigured(f"AI Studio prompt '{name}' response has no prompt text")
-            return prompt
-        except IntegrationNotConfigured:
-            raise
-        except Exception as exc:
-            raise IntegrationNotConfigured(f"AI Studio prompt '{name}' request failed: {exc}") from exc
+        for attempt in range(3):
+            try:
+                response = requests.get(f"{self.base_url}/prompts/{name}", headers=headers, timeout=self.timeout)
+                response.raise_for_status()
+                payload = response.json()
+                prompt = payload.get("prompt") or payload.get("template")
+                if not isinstance(prompt, str) or not prompt:
+                    raise IntegrationNotConfigured(f"AI Studio prompt '{name}' response has no prompt text")
+                return prompt
+            except IntegrationNotConfigured:
+                raise
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                if attempt == 2:
+                    raise IntegrationNotConfigured(f"AI Studio prompt '{name}' request failed after retries: {exc}") from exc
+                time.sleep(0.2 * (2**attempt))
+            except Exception as exc:
+                raise IntegrationNotConfigured(f"AI Studio prompt '{name}' request failed: {exc}") from exc
 
 
 def get_prompt_registry() -> PromptRegistry:
@@ -147,6 +154,7 @@ class BigQueryAuditSink:
             raise IntegrationNotConfigured(f"BigQuery audit insert failed: {errors}")
 
 
+@lru_cache(maxsize=1)
 def get_audit_sink() -> BigQueryAuditSink | None:
     if os.getenv("AUDIT_SINK", "local").lower() != "bigquery":
         return None

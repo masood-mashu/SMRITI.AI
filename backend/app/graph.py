@@ -5,10 +5,10 @@ from typing import Any, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from .db import session_scope
-from .extractor import get_extractor
+from .extractor import ProviderConfigurationError, get_extractor
 from .generation import get_vertex_generator
 from .integrations import get_prompt_registry
-from .privacy import get_pii_scrubber
+from .privacy import PrivacyPolicyError, get_pii_scrubber
 from .repositories import (
     get_current_facts,
     get_emergency_facts,
@@ -48,11 +48,14 @@ class SmritiState(TypedDict, total=False):
 
 def report_understanding_agent(state: SmritiState) -> dict[str, Any]:
     """Development extractor boundary; Gemini will replace this implementation."""
-    scrubbed = get_pii_scrubber().scrub(
-        content=state.get("report_bytes", b""),
-        filename=state.get("filename", "file"),
-        content_type=state.get("content_type", "application/octet-stream"),
-    )
+    try:
+        scrubbed = get_pii_scrubber().scrub(
+            content=state.get("report_bytes", b""),
+            filename=state.get("filename", "file"),
+            content_type=state.get("content_type", "application/octet-stream"),
+        )
+    except PrivacyPolicyError as exc:
+        raise ProviderConfigurationError(str(exc)) from exc
     extraction = get_extractor(use_fixture=state.get("use_fixture", False)).extract(
         filename=state.get("filename", "file"),
         content_type=state.get("content_type", "application/octet-stream"),

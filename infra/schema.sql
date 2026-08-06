@@ -31,7 +31,7 @@ CREATE TABLE health_facts (
     confidence             REAL
 );
 
-CREATE INDEX idx_facts_current ON health_facts (patient_id, fact_key) WHERE superseded_by IS NULL;
+CREATE UNIQUE INDEX idx_facts_current ON health_facts (patient_id, fact_key) WHERE superseded_by IS NULL;
 CREATE INDEX idx_facts_timeline ON health_facts (patient_id, effective_date);
 
 CREATE TABLE contradictions (
@@ -43,4 +43,3 @@ CREATE TABLE contradictions (
     detected_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     resolved         BOOLEAN NOT NULL DEFAULT false
 );
-
