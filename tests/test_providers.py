@@ -1,4 +1,4 @@
-from backend.app.extractor import FixtureExtractor, GeminiExtractorStub
+from backend.app.extractor import FixtureExtractor, GeminiExtractorStub, VertexGeminiExtractor
 from backend.app.privacy import GemmaPiiScrubber, RegexPiiScrubber
 
 
@@ -31,3 +31,25 @@ def test_gemma_scrubber_uses_safe_text_fallback() -> None:
     assert b"patient@example.com" not in result.content
     assert b"98765" not in result.content
 
+
+def test_vertex_gemini_adapter_parses_structured_response() -> None:
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            assert kwargs["model"] == "test-model"
+            assert kwargs["contents"][1]["mime_type"] == "application/pdf"
+
+            class Response:
+                text = '{"facts":[{"fact_type":"allergy","fact_key":"Penicillin","fact_value":"Severe reaction","effective_date":"2026-01-15"}],"explanation":"Sample explanation"}'
+
+            return Response()
+
+    class FakeClient:
+        models = FakeModels()
+
+    result = VertexGeminiExtractor(model="test-model", client=FakeClient()).extract(
+        filename="report.pdf",
+        content_type="application/pdf",
+        content=b"pdf-bytes",
+    )
+    assert result.provider == "vertex-gemini"
+    assert result.facts[0]["effective_date"].isoformat() == "2026-01-15"

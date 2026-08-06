@@ -27,4 +27,4 @@ The upload endpoint is available at `POST /reports` and runs only the Report Und
 
 The canonical architecture separates report ingestion from on-demand Doctor Brief, Emergency, and Language outputs while retaining the five-agent LangGraph design.
 
-Real uploads currently use the Gemini provider stub and do not produce facts. The synthetic fixture is opt-in with `fixture=true`; it is intended only for local development until the Vertex AI and Gemma adapters are connected.
+Real uploads use the Gemini provider stub by default and do not produce facts. Set `EXTRACTION_PROVIDER=vertex` and configure Google Cloud credentials to enable the Vertex Gemini adapter. The synthetic fixture is opt-in with `fixture=true`; it is intended only for local development.
