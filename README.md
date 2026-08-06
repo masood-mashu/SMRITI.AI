@@ -12,7 +12,7 @@ uvicorn backend.app.main:app --reload --port 8000
 streamlit run frontend/streamlit_app.py
 ```
 
-The upload endpoint is available at `POST /reports` and runs only the Report Understanding -> Memory ingestion path. Use `POST /reports?fixture=true` for the opt-in synthetic development profile; real uploads currently remain extraction stubs. The timeline is available at `GET /timeline`. On-demand stub endpoints are available at `POST /brief`, `POST /emergency`, and `POST /translate?language=hi`.
+The upload endpoint is available at `POST /reports` and runs only the Report Understanding -> Memory ingestion path. It accepts `patient_id`, `source_type`, and opt-in `fixture=true`. The timeline is available at `GET /timeline` and includes historical facts plus unresolved contradictions. On-demand stub endpoints are available at `POST /brief`, `POST /emergency`, and `POST /translate?language=hi`.
 
 ## Structure
 

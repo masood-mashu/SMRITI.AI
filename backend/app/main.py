@@ -10,7 +10,7 @@ from .graph import (
     language_graph,
     smriti_ingestion_graph,
 )
-from .repositories import get_fact_timeline
+from .repositories import get_fact_timeline, get_patient_contradictions
 from .models import HealthFact
 
 app = FastAPI(title="Smriti API", version="0.1.0")
@@ -53,6 +53,7 @@ def health() -> dict[str, str]:
 async def upload_report(
     file: UploadFile = File(...),
     patient_id: UUID | None = None,
+    source_type: str = "other",
     fixture: bool = False,
 ) -> dict:
     content = await file.read()
@@ -61,7 +62,7 @@ async def upload_report(
             "patient_id": resolve_patient_id(patient_id),
             "filename": file.filename or "upload",
             "content_type": file.content_type or "application/octet-stream",
-            "source_type": "other",
+            "source_type": source_type,
             "use_fixture": fixture,
             "report_bytes": content,
         })
@@ -78,9 +79,21 @@ def get_timeline(patient_id: UUID | None = None) -> dict:
     resolved_id = UUID(resolve_patient_id(patient_id))
     with session_scope() as session:
         facts = get_fact_timeline(session, resolved_id)
+        contradictions = get_patient_contradictions(session, resolved_id)
     return {
         "patient_id": str(resolved_id),
         "facts": [serialize_fact(fact) for fact in facts],
+        "contradictions": [
+            {
+                "contradiction_id": str(item.contradiction_id),
+                "fact_id_older": str(item.fact_id_older),
+                "fact_id_newer": str(item.fact_id_newer),
+                "description": item.description,
+                "detected_at": item.detected_at.isoformat(),
+                "resolved": item.resolved,
+            }
+            for item in contradictions
+        ],
     }
 
 

@@ -24,4 +24,4 @@ def test_fixture_upload_populates_timeline() -> None:
             "Metformin",
             "Penicillin",
         }
-
+        assert timeline.json()["contradictions"] == []
