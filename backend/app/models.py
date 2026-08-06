@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, Index, Text, text
+from sqlalchemy import JSON, Column, Index, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
@@ -27,7 +27,10 @@ class Report(SQLModel, table=True):
     source_type: str = Field(sa_column=Column(Text, nullable=False))
     uploaded_at: datetime = Field(default_factory=utc_now, nullable=False)
     file_url: Optional[str] = None
-    raw_extraction: Optional[dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
+    raw_extraction: Optional[dict[str, Any]] = Field(
+        default=None,
+        sa_column=Column(JSONB().with_variant(JSON, "sqlite")),
+    )
 
 
 class HealthFact(SQLModel, table=True):

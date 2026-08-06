@@ -4,15 +4,22 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from .db import session_scope
+from .repositories import persist_report_and_facts
+
 
 class SmritiState(TypedDict, total=False):
     patient_id: str
     filename: str
     content_type: str
+    source_type: str
     report_bytes: bytes
     target_language: str
     extracted_facts: list[dict[str, Any]]
     memory_updated: bool
+    report_id: str
+    persisted_fact_ids: list[str]
+    contradiction_ids: list[str]
     explanation: str
     doctor_brief: str
     emergency_card: str
@@ -25,8 +32,24 @@ def report_understanding_agent(state: SmritiState) -> dict[str, Any]:
 
 
 def memory_agent(state: SmritiState) -> dict[str, Any]:
-    """Stub: append-only merge into Postgres-backed health memory."""
-    return {"memory_updated": False}
+    """Persist the report and apply the append-only fact merge."""
+    from uuid import UUID
+
+    patient_id = UUID(state["patient_id"])
+    with session_scope() as session:
+        report, facts, contradictions = persist_report_and_facts(
+            session,
+            patient_id=patient_id,
+            source_type=state.get("source_type", "other"),
+            raw_extraction={"facts": state.get("extracted_facts", [])},
+            extracted_facts=state.get("extracted_facts", []),
+        )
+        return {
+            "memory_updated": True,
+            "report_id": str(report.report_id),
+            "persisted_fact_ids": [str(fact.fact_id) for fact in facts],
+            "contradiction_ids": [str(item.contradiction_id) for item in contradictions],
+        }
 
 
 def doctor_brief_agent(state: SmritiState) -> dict[str, str]:
