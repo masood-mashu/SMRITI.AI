@@ -17,16 +17,22 @@ engine = create_engine(
     pool_pre_ping=True,
     connect_args={"check_same_thread": False} if _is_sqlite else {},
 )
+_initialized = False
 
 
 def init_db() -> None:
     """Create the mapped tables for local development and first boot."""
+    global _initialized
+    if _initialized:
+        return
     SQLModel.metadata.create_all(engine)
+    _initialized = True
 
 
 @contextmanager
 def session_scope() -> Iterator[Session]:
     """Provide a transaction-scoped session for graph nodes and services."""
+    init_db()
     with Session(engine) as session:
         try:
             yield session
@@ -34,4 +40,3 @@ def session_scope() -> Iterator[Session]:
         except Exception:
             session.rollback()
             raise
-

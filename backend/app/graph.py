@@ -5,7 +5,12 @@ from typing import Any, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from .db import session_scope
-from .repositories import persist_report_and_facts
+from .repositories import (
+    get_current_facts,
+    get_emergency_facts,
+    get_patient_contradictions,
+    persist_report_and_facts,
+)
 
 
 class SmritiState(TypedDict, total=False):
@@ -20,6 +25,9 @@ class SmritiState(TypedDict, total=False):
     report_id: str
     persisted_fact_ids: list[str]
     contradiction_ids: list[str]
+    current_facts: list[dict[str, Any]]
+    emergency_facts: list[dict[str, Any]]
+    contradictions: list[dict[str, Any]]
     explanation: str
     doctor_brief: str
     emergency_card: str
@@ -53,18 +61,38 @@ def memory_agent(state: SmritiState) -> dict[str, Any]:
 
 
 def doctor_brief_agent(state: SmritiState) -> dict[str, str]:
-    """Stub: clinical brief and contradiction summary."""
-    return {"doctor_brief": "Doctor Brief Agent stub"}
+    """Read current memory and format a non-diagnostic brief stub."""
+    from uuid import UUID
+
+    with session_scope() as session:
+        facts = get_current_facts(session, UUID(state["patient_id"]))
+        contradictions = get_patient_contradictions(session, UUID(state["patient_id"]))
+    fact_lines = [f"- {fact.fact_key}: {fact.fact_value}" for fact in facts]
+    contradiction_lines = [item.description for item in contradictions]
+    brief = "Current health memory:\n" + ("\n".join(fact_lines) or "- No facts persisted yet.")
+    if contradiction_lines:
+        brief += "\nContradictions to review:\n- " + "\n- ".join(contradiction_lines)
+    return {"doctor_brief": brief}
 
 
 def emergency_agent(state: SmritiState) -> dict[str, str]:
-    """Stub: emergency-relevant structured profile."""
-    return {"emergency_card": "Emergency Agent stub"}
+    """Read only current facts marked emergency-relevant."""
+    from uuid import UUID
+
+    with session_scope() as session:
+        facts = get_emergency_facts(session, UUID(state["patient_id"]))
+    lines = [f"- {fact.fact_key}: {fact.fact_value}" for fact in facts]
+    return {"emergency_card": "Emergency-relevant facts:\n" + ("\n".join(lines) or "- None recorded yet.")}
 
 
 def language_agent(state: SmritiState) -> dict[str, str]:
-    """Stub: plain-language and regional-language translation."""
-    return {"translation": "Language Agent stub"}
+    """Read current memory before the future translation implementation."""
+    from uuid import UUID
+
+    with session_scope() as session:
+        facts = get_current_facts(session, UUID(state["patient_id"]))
+    language = state.get("target_language", "en")
+    return {"translation": f"Language Agent stub ({language}) using {len(facts)} current fact(s)."}
 
 
 def build_ingestion_graph():

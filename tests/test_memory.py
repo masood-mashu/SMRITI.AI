@@ -4,7 +4,11 @@ from uuid import uuid4
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from backend.app.models import Contradiction, HealthFact, Patient
-from backend.app.repositories import persist_report_and_facts
+from backend.app.repositories import (
+    get_current_facts,
+    get_emergency_facts,
+    persist_report_and_facts,
+)
 
 
 def make_session() -> Session:
@@ -76,3 +80,34 @@ def test_changed_value_supersedes_old_and_records_contradiction() -> None:
         assert contradiction.fact_id_older == old_facts[0].fact_id
         assert contradiction.fact_id_newer == new_facts[0].fact_id
 
+
+def test_memory_queries_return_current_and_emergency_facts() -> None:
+    patient_id = uuid4()
+    allergy = {
+        "fact_type": "allergy",
+        "fact_key": "Penicillin",
+        "fact_value": "Severe reaction",
+        "is_emergency_relevant": True,
+        "effective_date": date(2026, 8, 6),
+    }
+    condition = {
+        "fact_type": "condition",
+        "fact_key": "Hypertension",
+        "fact_value": "Recorded",
+        "is_emergency_relevant": False,
+        "effective_date": date(2026, 8, 6),
+    }
+    with make_session() as session:
+        persist_report_and_facts(
+            session,
+            patient_id=patient_id,
+            source_type="lab_result",
+            raw_extraction=None,
+            extracted_facts=[allergy, condition],
+        )
+        session.commit()
+        assert {item.fact_key for item in get_current_facts(session, patient_id)} == {
+            "Penicillin",
+            "Hypertension",
+        }
+        assert [item.fact_key for item in get_emergency_facts(session, patient_id)] == ["Penicillin"]

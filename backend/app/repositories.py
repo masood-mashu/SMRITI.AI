@@ -115,3 +115,14 @@ def get_emergency_facts(session: Session, patient_id: UUID) -> list[HealthFact]:
             ).order_by(HealthFact.effective_date)
         )
     )
+
+
+def get_patient_contradictions(session: Session, patient_id: UUID) -> list[Contradiction]:
+    return list(
+        session.exec(
+            select(Contradiction).where(
+                Contradiction.patient_id == patient_id,
+                Contradiction.resolved.is_(False),
+            ).order_by(Contradiction.detected_at)
+        )
+    )
