@@ -5,4 +5,4 @@ venv/
 .env
 .pytest_cache/
 .streamlit/
-
+*.egg-info/

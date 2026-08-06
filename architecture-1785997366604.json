@@ -11,23 +11,33 @@
       "ports": [
         {
           "id": "out-upload",
-          "label": "Upload Report",
-          "side": "bottom"
+          "label": "Upload/Request",
+          "side": "right"
         },
         {
-          "id": "in-stream",
-          "label": "Live Stream",
+          "id": "in-stream-understanding",
+          "label": "Explanation Stream",
+          "side": "top"
+        },
+        {
+          "id": "in-stream-doctor",
+          "label": "Brief Stream",
+          "side": "top"
+        },
+        {
+          "id": "in-stream-emergency",
+          "label": "Card Stream",
+          "side": "top"
+        },
+        {
+          "id": "in-stream-language",
+          "label": "Translation Stream",
           "side": "top"
         },
         {
           "id": "in",
           "label": "Input",
           "side": "left"
-        },
-        {
-          "id": "out",
-          "label": "Output",
-          "side": "right"
         },
         {
           "id": "left-2",
@@ -41,8 +51,8 @@
         },
         {
           "id": "left-4",
-          "side": "left",
-          "label": "Left 4"
+          "label": "Left 4",
+          "side": "left"
         }
       ],
       "data": {
@@ -61,23 +71,13 @@
       "generic_name": "Backend API",
       "ports": [
         {
-          "id": "in-ui",
-          "label": "API Request",
-          "side": "top"
-        },
-        {
-          "id": "out-agents",
-          "label": "Orchestrate",
-          "side": "bottom"
-        },
-        {
-          "id": "in",
-          "label": "Input",
+          "id": "in-request",
+          "label": "Request",
           "side": "left"
         },
         {
-          "id": "out",
-          "label": "Output",
+          "id": "out-trigger-understanding",
+          "label": "Trigger Extraction",
           "side": "right"
         },
         {
@@ -92,8 +92,8 @@
         },
         {
           "id": "left-4",
-          "side": "left",
-          "label": "Left 4"
+          "label": "Left 4",
+          "side": "left"
         }
       ],
       "data": {
@@ -113,18 +113,18 @@
       "generic_name": "Extraction Agent",
       "ports": [
         {
-          "id": "in",
-          "label": "Ingest Report",
+          "id": "in-trigger",
+          "label": "Trigger",
           "side": "left"
         },
         {
-          "id": "out-memory",
-          "label": "Structured Data",
+          "id": "out-data",
+          "label": "Extracted Data",
           "side": "right"
         },
         {
           "id": "out-stream",
-          "label": "Explanation Stream",
+          "label": "Stream Explanation",
           "side": "top"
         },
         {
@@ -134,7 +134,7 @@
         }
       ],
       "data": {
-        "description": "Extracts structured medical facts from images/PDFs using multimodal reasoning.",
+        "description": "Extracts structured medical facts from reports using Gemini 3.1 Pro's native multimodal capabilities. Streams plain-language explanations back to the UI.",
         "tech": [
           "Python",
           "Gemini 3.1 Pro (Native Multimodal)",
@@ -150,17 +150,17 @@
       "ports": [
         {
           "id": "in-data",
-          "label": "New Facts",
+          "label": "Extracted Data",
           "side": "left"
         },
         {
           "id": "out-db",
-          "label": "Merge/Store",
+          "label": "Merge/Insert",
           "side": "bottom"
         },
         {
-          "id": "out-agents",
-          "label": "Fan-out State",
+          "id": "out-fanout",
+          "label": "Fan-out Agents",
           "side": "right"
         },
         {
@@ -185,6 +185,7 @@
         }
       ],
       "data": {
+        "description": "Maintains the patient's structured, longitudinal health profile. Merges new extractions into history using an append-only pattern.",
         "tech": [
           "Python",
           "LangGraph",
@@ -199,8 +200,8 @@
       "generic_name": "Clinical Summarizer",
       "ports": [
         {
-          "id": "in",
-          "label": "Memory State",
+          "id": "in-fanout",
+          "label": "Fan-in",
           "side": "left"
         },
         {
@@ -209,8 +210,8 @@
           "side": "bottom"
         },
         {
-          "id": "out-ui",
-          "label": "Brief Stream",
+          "id": "out-stream",
+          "label": "Stream Brief",
           "side": "top"
         },
         {
@@ -230,6 +231,7 @@
         }
       ],
       "data": {
+        "description": "Generates clinical summaries and flags contradictions using history lookup.",
         "tech": [
           "Python",
           "Gemini 3.5 Flash",
@@ -244,18 +246,18 @@
       "generic_name": "Emergency Profiler",
       "ports": [
         {
-          "id": "in",
-          "label": "Memory State",
+          "id": "in-fanout",
+          "label": "Fan-in",
           "side": "left"
         },
         {
-          "id": "out-db",
+          "id": "out-db-lookup",
           "label": "Structured Lookup",
           "side": "bottom"
         },
         {
-          "id": "out-ui",
-          "label": "Card Stream",
+          "id": "out-stream",
+          "label": "Stream Card",
           "side": "top"
         },
         {
@@ -270,11 +272,12 @@
         },
         {
           "id": "right-3",
-          "side": "right",
-          "label": "Right 3"
+          "label": "Right 3",
+          "side": "right"
         }
       ],
       "data": {
+        "description": "Generates critical-info cards from structured memory lookups.",
         "tech": [
           "Python",
           "Gemini 3.5 Flash-Lite",
@@ -289,13 +292,13 @@
       "generic_name": "Translation Agent",
       "ports": [
         {
-          "id": "in",
-          "label": "Memory State",
+          "id": "in-fanout",
+          "label": "Fan-in",
           "side": "left"
         },
         {
-          "id": "out-ui",
-          "label": "Translation Stream",
+          "id": "out-stream",
+          "label": "Stream Translation",
           "side": "top"
         },
         {
@@ -305,11 +308,12 @@
         },
         {
           "id": "right-2",
-          "side": "right",
-          "label": "Right 2"
+          "label": "Right 2",
+          "side": "right"
         }
       ],
       "data": {
+        "description": "Translates outputs into plain language and regional languages (Kannada, Hindi).",
         "tech": [
           "Python",
           "Gemini 3.5 Flash",
@@ -324,8 +328,18 @@
       "generic_name": "Relational Database",
       "ports": [
         {
+          "id": "in-merge",
+          "label": "Merge/Insert",
+          "side": "top"
+        },
+        {
+          "id": "in-lookup",
+          "label": "Lookup",
+          "side": "top"
+        },
+        {
           "id": "in",
-          "label": "in",
+          "label": "Input",
           "side": "left"
         },
         {
@@ -353,8 +367,13 @@
       "generic_name": "Vector Database",
       "ports": [
         {
+          "id": "in-search",
+          "label": "Vector Search",
+          "side": "top"
+        },
+        {
           "id": "in",
-          "label": "in",
+          "label": "Input",
           "side": "left"
         },
         {
@@ -378,62 +397,10 @@
   ],
   "edges": [
     {
-      "id": "ui-to-backend",
-      "source": {
-        "nodeId": "streamlit-ui",
-        "portId": "out"
-      },
-      "target": {
-        "nodeId": "fastapi-backend",
-        "portId": "in"
-      },
-      "type": "http",
-      "label": "Upload & Request"
-    },
-    {
-      "id": "backend-to-understanding",
-      "source": {
-        "nodeId": "fastapi-backend",
-        "portId": "out"
-      },
-      "target": {
-        "nodeId": "report-understanding-agent",
-        "portId": "in"
-      },
-      "type": "internal-api",
-      "label": "Process Report"
-    },
-    {
-      "id": "understanding-to-memory",
-      "source": {
-        "nodeId": "report-understanding-agent",
-        "portId": "out-memory"
-      },
-      "target": {
-        "nodeId": "memory-agent",
-        "portId": "in-data"
-      },
-      "type": "internal-api",
-      "label": "Merge Facts"
-    },
-    {
-      "id": "memory-to-db",
-      "source": {
-        "nodeId": "memory-agent",
-        "portId": "out-agents"
-      },
-      "target": {
-        "nodeId": "health-profile-db",
-        "portId": "in"
-      },
-      "type": "database",
-      "label": "Persistent Storage"
-    },
-    {
       "id": "memory-to-vector-db",
       "source": {
         "nodeId": "memory-agent",
-        "portId": "right-2"
+        "portId": "out-fanout"
       },
       "target": {
         "nodeId": "report-vector-store-db",
@@ -443,45 +410,6 @@
       "label": "Vector Search"
     },
     {
-      "id": "memory-to-doctor",
-      "source": {
-        "nodeId": "memory-agent",
-        "portId": "right-3"
-      },
-      "target": {
-        "nodeId": "doctor-brief-agent",
-        "portId": "in"
-      },
-      "type": "internal-api",
-      "label": "Trigger Brief"
-    },
-    {
-      "id": "memory-to-emergency",
-      "source": {
-        "nodeId": "memory-agent",
-        "portId": "right-4"
-      },
-      "target": {
-        "nodeId": "emergency-agent",
-        "portId": "in"
-      },
-      "type": "internal-api",
-      "label": "Trigger Card"
-    },
-    {
-      "id": "memory-to-language",
-      "source": {
-        "nodeId": "memory-agent",
-        "portId": "right-5"
-      },
-      "target": {
-        "nodeId": "language-agent",
-        "portId": "in"
-      },
-      "type": "internal-api",
-      "label": "Trigger Translation"
-    },
-    {
       "id": "doctor-brief-to-backend",
       "source": {
         "nodeId": "doctor-brief-agent",
@@ -489,7 +417,7 @@
       },
       "target": {
         "nodeId": "fastapi-backend",
-        "portId": "left-2"
+        "portId": "in-request"
       },
       "type": "internal-api",
       "label": "Return Brief"
@@ -502,7 +430,7 @@
       },
       "target": {
         "nodeId": "fastapi-backend",
-        "portId": "left-3"
+        "portId": "left-2"
       },
       "type": "internal-api",
       "label": "Return Card"
@@ -515,65 +443,52 @@
       },
       "target": {
         "nodeId": "fastapi-backend",
-        "portId": "left-4"
+        "portId": "left-3"
       },
       "type": "internal-api",
       "label": "Return Translation"
     },
     {
-      "id": "doctor-to-vector-search",
-      "source": {
-        "nodeId": "doctor-brief-agent",
-        "portId": "right-2"
-      },
-      "target": {
-        "nodeId": "report-vector-store-db",
-        "portId": "left-2"
-      },
-      "type": "database",
-      "label": "History Lookup (Vector Search)"
-    },
-    {
-      "id": "emergency-to-structured-db",
+      "id": "emergency-to-db",
       "source": {
         "nodeId": "emergency-agent",
         "portId": "right-2"
       },
       "target": {
         "nodeId": "health-profile-db",
-        "portId": "left-2"
+        "portId": "in"
       },
       "type": "database",
       "label": "Structured Lookup"
     },
     {
-      "id": "understanding-to-ui-stream",
+      "id": "understanding-to-streamlit",
       "source": {
         "nodeId": "report-understanding-agent",
-        "portId": "right-2"
+        "portId": "out-data"
       },
       "target": {
         "nodeId": "streamlit-ui",
         "portId": "in"
       },
       "type": "websocket",
-      "label": "Return Explanation (Streaming)"
+      "label": "Stream Explanation"
     },
     {
-      "id": "doctor-to-ui-stream",
+      "id": "doctor-to-streamlit",
       "source": {
         "nodeId": "doctor-brief-agent",
-        "portId": "right-3"
+        "portId": "right-2"
       },
       "target": {
         "nodeId": "streamlit-ui",
         "portId": "left-2"
       },
       "type": "websocket",
-      "label": "Brief Stream"
+      "label": "Stream Brief"
     },
     {
-      "id": "emergency-to-ui-stream",
+      "id": "emergency-to-streamlit",
       "source": {
         "nodeId": "emergency-agent",
         "portId": "right-3"
@@ -583,10 +498,10 @@
         "portId": "left-3"
       },
       "type": "websocket",
-      "label": "Card Stream"
+      "label": "Stream Card"
     },
     {
-      "id": "language-to-ui-stream",
+      "id": "language-to-streamlit",
       "source": {
         "nodeId": "language-agent",
         "portId": "right-2"
@@ -596,36 +511,134 @@
         "portId": "left-4"
       },
       "type": "websocket",
-      "label": "Translation Stream"
+      "label": "Stream Translation"
+    },
+    {
+      "id": "streamlit-to-fastapi",
+      "source": {
+        "nodeId": "streamlit-ui",
+        "portId": "out-upload"
+      },
+      "target": {
+        "nodeId": "fastapi-backend",
+        "portId": "left-4"
+      },
+      "type": "http",
+      "label": "Upload/Request"
+    },
+    {
+      "id": "fastapi-to-understanding",
+      "source": {
+        "nodeId": "fastapi-backend",
+        "portId": "out-trigger-understanding"
+      },
+      "target": {
+        "nodeId": "report-understanding-agent",
+        "portId": "in-trigger"
+      },
+      "type": "internal-api",
+      "label": "Trigger Extraction"
+    },
+    {
+      "id": "understanding-to-memory",
+      "source": {
+        "nodeId": "report-understanding-agent",
+        "portId": "right-2"
+      },
+      "target": {
+        "nodeId": "memory-agent",
+        "portId": "in-data"
+      },
+      "type": "internal-api",
+      "label": "Extracted Data"
+    },
+    {
+      "id": "memory-to-db",
+      "source": {
+        "nodeId": "memory-agent",
+        "portId": "right-2"
+      },
+      "target": {
+        "nodeId": "health-profile-db",
+        "portId": "left-2"
+      },
+      "type": "database",
+      "label": "Merge/Insert"
+    },
+    {
+      "id": "memory-to-doctor",
+      "source": {
+        "nodeId": "memory-agent",
+        "portId": "right-3"
+      },
+      "target": {
+        "nodeId": "doctor-brief-agent",
+        "portId": "in-fanout"
+      },
+      "type": "internal-api",
+      "label": "Fan-out Brief"
+    },
+    {
+      "id": "memory-to-emergency",
+      "source": {
+        "nodeId": "memory-agent",
+        "portId": "right-4"
+      },
+      "target": {
+        "nodeId": "emergency-agent",
+        "portId": "in-fanout"
+      },
+      "type": "internal-api",
+      "label": "Fan-out Emergency"
+    },
+    {
+      "id": "memory-to-language",
+      "source": {
+        "nodeId": "memory-agent",
+        "portId": "right-5"
+      },
+      "target": {
+        "nodeId": "language-agent",
+        "portId": "in-fanout"
+      },
+      "type": "internal-api",
+      "label": "Fan-out Language"
+    },
+    {
+      "id": "doctor-to-vector",
+      "source": {
+        "nodeId": "doctor-brief-agent",
+        "portId": "right-3"
+      },
+      "target": {
+        "nodeId": "report-vector-store-db",
+        "portId": "left-2"
+      },
+      "type": "database",
+      "label": "History Lookup"
     }
   ],
   "groups": [
-    {
-      "children": [
-        "streamlit-ui",
-        "fastapi-backend"
-      ],
-      "id": "app-layer",
-      "label": "Application Layer (Cloud Run)"
-    },
-    {
-      "children": [
-        "report-understanding-agent",
-        "memory-agent",
-        "doctor-brief-agent",
-        "emergency-agent",
-        "language-agent"
-      ],
-      "id": "agent-swarm",
-      "label": "AI Agent Swarm (LangGraph)"
-    },
     {
       "children": [
         "health-profile-db",
         "report-vector-store-db"
       ],
       "id": "data-persistence",
-      "label": "Data Persistence (GCP Managed)"
+      "label": "GCP Managed Data Services"
+    },
+    {
+      "children": [
+        "streamlit-ui",
+        "fastapi-backend",
+        "report-understanding-agent",
+        "memory-agent",
+        "doctor-brief-agent",
+        "emergency-agent",
+        "language-agent"
+      ],
+      "id": "cloud-run-deployment",
+      "label": "GCP Cloud Run (Application Layer)"
     }
   ],
   "metadata": {}
