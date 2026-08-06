@@ -29,6 +29,8 @@ The canonical architecture separates report ingestion from on-demand Doctor Brie
 
 Real uploads use the Gemini provider stub by default and do not produce facts. Set `EXTRACTION_PROVIDER=vertex` and configure Google Cloud credentials to enable the Vertex Gemini adapter. The synthetic fixture is opt-in with `fixture=true`; it is intended only for local development.
 
+Set `OUTPUT_PROVIDER=vertex` to opt into Vertex-backed Doctor Brief, Emergency Card, and Language generation. The output model IDs are configurable with `DOCTOR_BRIEF_MODEL`, `EMERGENCY_MODEL`, and `LANGUAGE_MODEL`; the deterministic outputs remain the default when billing or credentials are unavailable.
+
 To explicitly test Vertex extraction against one local report, configure Application Default Credentials and run `python scripts/vertex_smoke.py path/to/report.pdf`.
 
 For a no-PII local test input, use `samples/synthetic_medical_report.txt`.

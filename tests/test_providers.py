@@ -8,6 +8,7 @@ from backend.app.extractor import (
     VertexGeminiExtractor,
 )
 from backend.app.privacy import GemmaPiiScrubber, RegexPiiScrubber
+from backend.app.generation import GenerationError, VertexTextGenerator
 
 
 def test_fixture_and_gemini_provider_contracts() -> None:
@@ -105,3 +106,35 @@ def test_vertex_gemini_adapter_wraps_request_errors() -> None:
             content_type="application/pdf",
             content=b"pdf-bytes",
         )
+
+
+def test_vertex_text_generator_uses_injected_client() -> None:
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            assert kwargs["model"] == "test-model"
+
+            class Response:
+                text = "Safe generated summary"
+
+            return Response()
+
+    class FakeClient:
+        models = FakeModels()
+
+    result = VertexTextGenerator(model="test-model", client=FakeClient()).generate(
+        prompt="Summarize these recorded facts."
+    )
+    assert result.provider == "vertex-gemini"
+    assert result.text == "Safe generated summary"
+
+
+def test_vertex_text_generator_wraps_request_errors() -> None:
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            raise RuntimeError("billing disabled")
+
+    class FakeClient:
+        models = FakeModels()
+
+    with pytest.raises(GenerationError, match="Vertex output generation failed"):
+        VertexTextGenerator(model="test-model", client=FakeClient()).generate(prompt="test")

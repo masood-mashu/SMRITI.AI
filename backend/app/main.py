@@ -2,10 +2,12 @@ from uuid import UUID
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
 
 from .db import init_db, session_scope
 from .extractor import ExtractionError, ProviderConfigurationError
+from .generation import GenerationError
 from .graph import (
     doctor_brief_graph,
     emergency_graph,
@@ -21,6 +23,11 @@ DEFAULT_PATIENT_ID = UUID("00000000-0000-0000-0000-000000000001")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = {"application/pdf", "image/png", "image/jpeg", "text/plain"}
 ALLOWED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".txt"}
+
+
+@app.exception_handler(GenerationError)
+async def generation_error_handler(request: Request, exc: GenerationError) -> JSONResponse:
+    return JSONResponse(status_code=502, content={"detail": str(exc)})
 
 
 def resolve_patient_id(patient_id: UUID | None) -> str:

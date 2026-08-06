@@ -6,6 +6,7 @@ from langgraph.graph import END, START, StateGraph
 
 from .db import session_scope
 from .extractor import get_extractor
+from .generation import get_vertex_generator
 from .privacy import get_pii_scrubber
 from .repositories import (
     get_current_facts,
@@ -39,6 +40,9 @@ class SmritiState(TypedDict, total=False):
     doctor_brief: str
     emergency_card: str
     translation: str
+    doctor_brief_provider: str
+    emergency_card_provider: str
+    translation_provider: str
 
 
 def report_understanding_agent(state: SmritiState) -> dict[str, Any]:
@@ -93,10 +97,21 @@ def doctor_brief_agent(state: SmritiState) -> dict[str, str]:
         contradictions = get_patient_contradictions(session, UUID(state["patient_id"]))
     fact_lines = [f"- {fact.fact_key}: {fact.fact_value}" for fact in facts]
     contradiction_lines = [item.description for item in contradictions]
-    brief = "Current health memory:\n" + ("\n".join(fact_lines) or "- No facts persisted yet.")
+    context = "Current health memory:\n" + ("\n".join(fact_lines) or "- No facts persisted yet.")
     if contradiction_lines:
-        brief += "\nContradictions to review:\n- " + "\n- ".join(contradiction_lines)
-    return {"doctor_brief": brief}
+        context += "\nContradictions to review:\n- " + "\n- ".join(contradiction_lines)
+    generator = get_vertex_generator(
+        model_env="DOCTOR_BRIEF_MODEL",
+        default_model="gemini-3.5-flash",
+    )
+    if generator is not None:
+        result = generator.generate(prompt=(
+            "Create a concise clinician-facing summary from the following patient-owned memory. "
+            "Only organize recorded facts, explicitly call out contradictions for review, and do not "
+            "diagnose or recommend treatment.\n\n" + context
+        ))
+        return {"doctor_brief": result.text, "doctor_brief_provider": result.provider}
+    return {"doctor_brief": context, "doctor_brief_provider": "deterministic"}
 
 
 def emergency_agent(state: SmritiState) -> dict[str, str]:
@@ -106,7 +121,18 @@ def emergency_agent(state: SmritiState) -> dict[str, str]:
     with session_scope() as session:
         facts = get_emergency_facts(session, UUID(state["patient_id"]))
     lines = [f"- {fact.fact_key}: {fact.fact_value}" for fact in facts]
-    return {"emergency_card": "Emergency-relevant facts:\n" + ("\n".join(lines) or "- None recorded yet.")}
+    card = "Emergency-relevant facts:\n" + ("\n".join(lines) or "- None recorded yet.")
+    generator = get_vertex_generator(
+        model_env="EMERGENCY_MODEL",
+        default_model="gemini-3.5-flash-lite",
+    )
+    if generator is not None:
+        result = generator.generate(prompt=(
+            "Format the following emergency-relevant health facts as a compact information card. "
+            "Do not diagnose, infer, or recommend treatment. If there are no facts, say so clearly.\n\n" + card
+        ))
+        return {"emergency_card": result.text, "emergency_card_provider": result.provider}
+    return {"emergency_card": card, "emergency_card_provider": "deterministic"}
 
 
 def language_agent(state: SmritiState) -> dict[str, str]:
@@ -116,7 +142,19 @@ def language_agent(state: SmritiState) -> dict[str, str]:
     with session_scope() as session:
         facts = get_current_facts(session, UUID(state["patient_id"]))
     language = state.get("target_language", "en")
-    return {"translation": f"Language Agent stub ({language}) using {len(facts)} current fact(s)."}
+    summary = "\n".join(f"- {fact.fact_key}: {fact.fact_value}" for fact in facts)
+    generator = get_vertex_generator(
+        model_env="LANGUAGE_MODEL",
+        default_model="gemini-3.5-flash",
+    )
+    if generator is not None:
+        result = generator.generate(prompt=(
+            f"Translate the following patient-owned health summary into {language}. "
+            "Preserve facts exactly, use plain language, and do not diagnose or recommend treatment.\n\n" +
+            (summary or "No facts recorded yet.")
+        ))
+        return {"translation": result.text, "translation_provider": result.provider}
+    return {"translation": f"Language Agent stub ({language}) using {len(facts)} current fact(s).", "translation_provider": "deterministic"}
 
 
 def build_ingestion_graph():
