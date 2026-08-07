@@ -22,6 +22,7 @@ class Patient(SQLModel, table=True):
 
 class Report(SQLModel, table=True):
     __tablename__ = "reports"
+    __table_args__ = (Index("idx_reports_patient", "patient_id", "uploaded_at"),)
     report_id: UUID = Field(default_factory=uuid4, primary_key=True)
     patient_id: UUID = Field(foreign_key="patients.patient_id", nullable=False)
     source_type: str = Field(sa_column=Column(Text, nullable=False))
@@ -63,6 +64,7 @@ class HealthFact(SQLModel, table=True):
 
 class Contradiction(SQLModel, table=True):
     __tablename__ = "contradictions"
+    __table_args__ = (Index("idx_contradictions_patient", "patient_id", "detected_at"),)
     contradiction_id: UUID = Field(default_factory=uuid4, primary_key=True)
     patient_id: UUID = Field(foreign_key="patients.patient_id", nullable=False)
     fact_id_older: UUID = Field(foreign_key="health_facts.fact_id", nullable=False)

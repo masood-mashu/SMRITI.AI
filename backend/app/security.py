@@ -121,6 +121,8 @@ def require_security(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
 ) -> None:
     settings = Settings.from_env()
+    if settings.environment == "production" and (not settings.auth_enabled or settings.auth_mode != "oidc"):
+        raise HTTPException(status_code=503, detail="Production requires OIDC authentication")
     client_key = request.client.host if request.client else "unknown"
     if settings.rate_limit_backend == "redis":
         if not settings.redis_url:

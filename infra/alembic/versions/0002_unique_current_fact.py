@@ -27,6 +27,6 @@ def downgrade() -> None:
         "idx_facts_current",
         "health_facts",
         ["patient_id", "fact_key"],
-        unique=True,
+        unique=False,
         postgresql_where=sa.text("superseded_by IS NULL"),
     )

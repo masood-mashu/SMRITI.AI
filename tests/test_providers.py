@@ -79,6 +79,7 @@ def test_vertex_gemini_adapter_parses_structured_response() -> None:
         def generate_content(self, **kwargs):
             assert kwargs["model"] == "test-model"
             assert kwargs["contents"][1]["mime_type"] == "application/pdf"
+            assert kwargs["config"]["max_output_tokens"] == 4096
 
             class Response:
                 text = '{"facts":[{"fact_type":"allergy","fact_key":"Penicillin","fact_value":"Severe reaction","effective_date":"2026-01-15"}],"explanation":"Sample explanation"}'
@@ -145,6 +146,7 @@ def test_vertex_text_generator_uses_injected_client() -> None:
     class FakeModels:
         def generate_content(self, **kwargs):
             assert kwargs["model"] == "test-model"
+            assert kwargs["config"]["max_output_tokens"] == 2048
 
             class Response:
                 text = "Safe generated summary"

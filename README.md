@@ -63,6 +63,8 @@ configuration instead, set `$env:SMRITI_ENV="production"` before starting.
 - `GET /health/ready` - database readiness
 - `POST /reports` - upload a report; use `fixture=true` only for development
 - `GET /timeline` - current and superseded facts plus contradictions
+- `DELETE /patients/{id}` - erase authorized patient records and stored reports
+- `GET /metrics` - protected Prometheus-compatible process counters
 - `POST /brief` - generate Doctor Brief on demand
 - `POST /emergency` - generate Emergency output on demand
 - `POST /translate?language=hi` - generate Language output on demand
@@ -85,6 +87,7 @@ DATABASE_URL=postgresql+psycopg://...
 DB_AUTO_CREATE=false
 AUTH_ENABLED=true
 AUTH_MODE=oidc
+SMRITI_VALIDATE_PRODUCTION=true
 OIDC_ISSUER=https://...
 OIDC_AUDIENCE=smriti-api
 OIDC_JWKS_URL=https://.../.well-known/jwks.json
@@ -95,6 +98,10 @@ STORAGE_ENCRYPTION_REQUIRED=true
 STORAGE_ENCRYPTION_KEY=<base64-fernet-key>
 STORAGE_RETENTION_DAYS=30
 UPLOAD_SIGNATURE_CHECK=true
+PHI_STRICT=true
+STORE_RAW_EXTRACTION=false
+EXTRACTION_MAX_OUTPUT_TOKENS=4096
+OUTPUT_MAX_OUTPUT_TOKENS=2048
 ```
 
 For local/demo authentication, use `AUTH_MODE=token` and
@@ -133,6 +140,24 @@ $env:DATABASE_URL="postgresql+psycopg://..."
 
 Alembic migrations target PostgreSQL. Local SQLite development uses
 `DB_AUTO_CREATE=true` and does not run the PostgreSQL migration chain.
+
+## Validation and operations
+
+Run the deterministic synthetic extraction baseline and the full test gate:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/run_extraction_eval.py
+.\.venv\Scripts\python.exe -m pytest --cov=backend --cov-fail-under=75 -q
+```
+
+For a running non-production service, use the opt-in load smoke tool:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/load_smoke.py --base-url http://localhost:8000 --requests 100 --concurrency 10
+```
+
+Do not point the load tool at production without an approved test plan. The
+backup and restore drill is documented in [infra/ops/backup_restore.md](infra/ops/backup_restore.md).
 
 `infra/schema.sql` remains the canonical reference DDL. The migration preserves
 the required tables: `patients`, `reports`, `health_facts`, and

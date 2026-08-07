@@ -150,6 +150,32 @@ def get_patient_contradictions(session: Session, patient_id: UUID) -> list[Contr
     )
 
 
+def delete_patient_data(session: Session, patient_id: UUID) -> list[str] | None:
+    """Delete a patient's database records and return report storage references."""
+    patient = session.get(Patient, patient_id)
+    if patient is None:
+        return None
+
+    reports = list(session.exec(select(Report).where(Report.patient_id == patient_id)))
+    facts = list(session.exec(select(HealthFact).where(HealthFact.patient_id == patient_id)))
+    contradictions = list(session.exec(select(Contradiction).where(Contradiction.patient_id == patient_id)))
+
+    # Break self-referential fact links before deleting the fact rows.
+    for fact in facts:
+        fact.superseded_by = None
+        session.add(fact)
+    session.flush()
+    for contradiction in contradictions:
+        session.delete(contradiction)
+    for fact in facts:
+        session.delete(fact)
+    for report in reports:
+        session.delete(report)
+    session.delete(patient)
+    session.flush()
+    return [report.file_url for report in reports if report.file_url]
+
+
 def review_contradiction(
     session: Session,
     *,

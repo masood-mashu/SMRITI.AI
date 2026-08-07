@@ -33,6 +33,7 @@ CREATE TABLE health_facts (
 
 CREATE UNIQUE INDEX idx_facts_current ON health_facts (patient_id, fact_key) WHERE superseded_by IS NULL;
 CREATE INDEX idx_facts_timeline ON health_facts (patient_id, effective_date);
+CREATE INDEX idx_reports_patient ON reports (patient_id, uploaded_at);
 
 CREATE TABLE contradictions (
     contradiction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -47,3 +48,5 @@ CREATE TABLE contradictions (
     reviewed_at      TIMESTAMPTZ,
     reviewed_by      TEXT
 );
+
+CREATE INDEX idx_contradictions_patient ON contradictions (patient_id, detected_at);

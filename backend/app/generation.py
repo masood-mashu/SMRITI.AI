@@ -58,9 +58,15 @@ class VertexTextGenerator:
         if self._client is None:
             from google.genai import types
 
-            config = types.GenerateContentConfig(temperature=0.2)
+            config = types.GenerateContentConfig(
+                temperature=0.2,
+                max_output_tokens=int(os.getenv("OUTPUT_MAX_OUTPUT_TOKENS", "2048")),
+            )
         else:
-            config = {"temperature": 0.2}
+            config = {
+                "temperature": 0.2,
+                "max_output_tokens": int(os.getenv("OUTPUT_MAX_OUTPUT_TOKENS", "2048")),
+            }
         response = None
         for attempt in range(3):
             try:
@@ -86,9 +92,15 @@ class VertexTextGenerator:
         if self._client is None:
             from google.genai import types
 
-            config = types.GenerateContentConfig(temperature=0.2)
+            config = types.GenerateContentConfig(
+                temperature=0.2,
+                max_output_tokens=int(os.getenv("OUTPUT_MAX_OUTPUT_TOKENS", "2048")),
+            )
         else:
-            config = {"temperature": 0.2}
+            config = {
+                "temperature": 0.2,
+                "max_output_tokens": int(os.getenv("OUTPUT_MAX_OUTPUT_TOKENS", "2048")),
+            }
         for attempt in range(3):
             try:
                 chunks = self.client.models.generate_content_stream(

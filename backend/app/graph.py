@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 from typing import Any, TypedDict
+import os
 
 from langgraph.graph import END, START, StateGraph
 
@@ -16,6 +17,16 @@ from .repositories import (
     get_patient_contradictions,
     persist_report_and_facts,
 )
+
+
+CLINICAL_SAFETY_NOTICE = (
+    "Clinical safety note: This output summarizes recorded health information and is not a diagnosis "
+    "or a treatment recommendation. A qualified clinician must review it before clinical use."
+)
+
+
+def with_clinical_notice(text: str) -> str:
+    return f"{text.rstrip()}\n\n{CLINICAL_SAFETY_NOTICE}"
 
 
 class SmritiState(TypedDict, total=False):
@@ -89,7 +100,12 @@ def memory_agent(state: SmritiState) -> dict[str, Any]:
             session,
             patient_id=patient_id,
             source_type=state.get("source_type", "other"),
-            raw_extraction={"facts": state.get("extracted_facts", [])},
+            raw_extraction=(
+                {"facts": state.get("extracted_facts", [])}
+                if os.getenv("SMRITI_ENV", "development").lower() != "production"
+                or os.getenv("STORE_RAW_EXTRACTION", "false").lower() in {"1", "true", "yes", "on"}
+                else None
+            ),
             extracted_facts=state.get("extracted_facts", []),
             file_url=state.get("file_url"),
         )
@@ -121,8 +137,8 @@ def doctor_brief_agent(state: SmritiState) -> dict[str, str]:
         result = generator.generate(prompt=(
             get_prompt_registry().get("doctor_brief").format(context=context)
         ))
-        return {"doctor_brief": result.text, "doctor_brief_provider": result.provider}
-    return {"doctor_brief": context, "doctor_brief_provider": "deterministic"}
+        return {"doctor_brief": with_clinical_notice(result.text), "doctor_brief_provider": result.provider}
+    return {"doctor_brief": with_clinical_notice(context), "doctor_brief_provider": "deterministic"}
 
 
 def emergency_agent(state: SmritiState) -> dict[str, str]:
@@ -141,8 +157,8 @@ def emergency_agent(state: SmritiState) -> dict[str, str]:
         result = generator.generate(prompt=(
             get_prompt_registry().get("emergency_card").format(context=card)
         ))
-        return {"emergency_card": result.text, "emergency_card_provider": result.provider}
-    return {"emergency_card": card, "emergency_card_provider": "deterministic"}
+        return {"emergency_card": with_clinical_notice(result.text), "emergency_card_provider": result.provider}
+    return {"emergency_card": with_clinical_notice(card), "emergency_card_provider": "deterministic"}
 
 
 def language_agent(state: SmritiState) -> dict[str, str]:
@@ -164,8 +180,8 @@ def language_agent(state: SmritiState) -> dict[str, str]:
                 context=summary or "No facts recorded yet.",
             )
         ))
-        return {"translation": result.text, "translation_provider": result.provider}
-    return {"translation": f"Language Agent stub ({language}) using {len(facts)} current fact(s).", "translation_provider": "deterministic"}
+        return {"translation": with_clinical_notice(result.text), "translation_provider": result.provider}
+    return {"translation": with_clinical_notice(f"Language Agent stub ({language}) using {len(facts)} current fact(s)."), "translation_provider": "deterministic"}
 
 
 def stream_doctor_brief(state: SmritiState) -> Iterator[str]:
@@ -180,10 +196,11 @@ def stream_doctor_brief(state: SmritiState) -> Iterator[str]:
         context += "\nContradictions to review:\n- " + "\n- ".join(item.description for item in contradictions)
     generator = get_vertex_generator(model_env="DOCTOR_BRIEF_MODEL", default_model="gemini-3.5-flash")
     if generator is None:
-        yield context
+        yield with_clinical_notice(context)
         return
     prompt = get_prompt_registry().get("doctor_brief").format(context=context)
     yield from generator.stream(prompt=prompt)
+    yield f"\n\n{CLINICAL_SAFETY_NOTICE}"
 
 
 def stream_emergency(state: SmritiState) -> Iterator[str]:
@@ -194,9 +211,10 @@ def stream_emergency(state: SmritiState) -> Iterator[str]:
     card = "Emergency-relevant facts:\n" + ("\n".join(f"- {fact.fact_key}: {fact.fact_value}" for fact in facts) or "- None recorded yet.")
     generator = get_vertex_generator(model_env="EMERGENCY_MODEL", default_model="gemini-3.5-flash-lite")
     if generator is None:
-        yield card
+        yield with_clinical_notice(card)
         return
     yield from generator.stream(prompt=get_prompt_registry().get("emergency_card").format(context=card))
+    yield f"\n\n{CLINICAL_SAFETY_NOTICE}"
 
 
 def stream_language(state: SmritiState) -> Iterator[str]:
@@ -208,9 +226,10 @@ def stream_language(state: SmritiState) -> Iterator[str]:
     summary = "\n".join(f"- {fact.fact_key}: {fact.fact_value}" for fact in facts) or "No facts recorded yet."
     generator = get_vertex_generator(model_env="LANGUAGE_MODEL", default_model="gemini-3.5-flash")
     if generator is None:
-        yield f"Language Agent stub ({language}) using {len(facts)} current fact(s)."
+        yield with_clinical_notice(f"Language Agent stub ({language}) using {len(facts)} current fact(s).")
         return
     yield from generator.stream(prompt=get_prompt_registry().get("language").format(language=language, context=summary))
+    yield f"\n\n{CLINICAL_SAFETY_NOTICE}"
 
 
 def build_ingestion_graph():

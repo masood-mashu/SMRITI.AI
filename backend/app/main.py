@@ -8,7 +8,8 @@ import json
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
-from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .db import check_database, init_db, session_scope
@@ -24,7 +25,12 @@ from .graph import (
     stream_emergency,
     stream_language,
 )
-from .repositories import get_fact_timeline_page, get_patient_contradictions, review_contradiction
+from .repositories import (
+    delete_patient_data,
+    get_fact_timeline_page,
+    get_patient_contradictions,
+    review_contradiction,
+)
 from .models import HealthFact
 from .storage import StorageError, get_storage
 from .observability import audit_log, prometheus_metrics, record_metric, trace_span
@@ -41,6 +47,15 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Smriti API", version="0.1.0", lifespan=lifespan)
+cors_origins = [origin.strip() for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if origin.strip()]
+if cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    )
 app.include_router(mcp_router)
 DEFAULT_PATIENT_ID = UUID("00000000-0000-0000-0000-000000000001")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -200,6 +215,38 @@ def readiness() -> dict[str, str]:
 @app.get("/metrics", dependencies=[Depends(require_security)])
 def metrics() -> PlainTextResponse:
     return PlainTextResponse(prometheus_metrics(), media_type="text/plain; version=0.0.4")
+
+
+@app.delete("/patients/{patient_id}", status_code=204, dependencies=[Depends(require_security)])
+def delete_patient(patient_id: UUID, request: Request) -> Response:
+    """Erase a patient's database records and uploaded report objects."""
+    resolved_id = UUID(resolve_patient_id(patient_id, request))
+    try:
+        storage = get_storage()
+    except StorageError as exc:
+        raise HTTPException(status_code=503, detail="Storage is unavailable") from exc
+
+    with session_scope() as session:
+        references = delete_patient_data(session, resolved_id)
+        if references is None:
+            raise HTTPException(status_code=404, detail="Patient not found")
+
+    cleanup_failures = 0
+    for reference in references:
+        try:
+            storage.delete(reference)
+        except StorageError:
+            cleanup_failures += 1
+            audit_log("patient_storage_cleanup_failed", patient_id=str(resolved_id), reference=reference)
+    audit_log(
+        "patient_deleted",
+        patient_id=str(resolved_id),
+        report_count=len(references),
+        storage_cleanup_failures=cleanup_failures,
+    )
+    if cleanup_failures:
+        raise HTTPException(status_code=503, detail="Patient data was removed from the database but storage cleanup is incomplete")
+    return Response(status_code=204)
 
 
 @app.post("/reports", dependencies=[Depends(require_security)])

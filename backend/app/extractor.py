@@ -154,10 +154,15 @@ treatment, or infer missing information. Return JSON with this exact shape:
             config = types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0,
+                max_output_tokens=int(os.getenv("EXTRACTION_MAX_OUTPUT_TOKENS", "4096")),
             )
         else:
             file_part = {"data": content, "mime_type": content_type}
-            config = {"response_mime_type": "application/json", "temperature": 0}
+            config = {
+                "response_mime_type": "application/json",
+                "temperature": 0,
+                "max_output_tokens": int(os.getenv("EXTRACTION_MAX_OUTPUT_TOKENS", "4096")),
+            }
 
         response = None
         for attempt in range(3):

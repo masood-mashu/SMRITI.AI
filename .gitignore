@@ -11,3 +11,5 @@ venv/
 samples/*
 !samples/synthetic_medical_report.txt
 .data/
+.coverage
+htmlcov/

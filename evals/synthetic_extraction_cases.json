@@ -1,0 +1,7 @@
+[
+  {
+    "name": "synthetic longitudinal profile",
+    "report": "Synthetic report: diabetes, metformin 500 mg, and severe penicillin reaction.",
+    "expected_fact_keys": ["Type 2 diabetes", "Metformin", "Penicillin"]
+  }
+]

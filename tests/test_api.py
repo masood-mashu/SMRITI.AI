@@ -7,8 +7,9 @@ from fastapi.testclient import TestClient
 from sqlmodel import select
 
 from backend.app.db import session_scope
+from backend.app.graph import smriti_ingestion_graph
 from backend.app.main import app
-from backend.app.models import Contradiction
+from backend.app.models import Contradiction, Report
 from backend.app.repositories import persist_report_and_facts
 from backend.app.security import rate_limiter
 
@@ -78,6 +79,62 @@ def test_request_body_limit_is_enforced(monkeypatch) -> None:
         assert response.status_code == 413
 
 
+def test_patient_deletion_removes_database_records_and_upload(monkeypatch) -> None:
+    patient_id = uuid4()
+    storage_dir = Path(".data") / f"test-delete-patient-{uuid4()}"
+    monkeypatch.setenv("STORAGE_PROVIDER", "local")
+    monkeypatch.setenv("LOCAL_STORAGE_DIR", str(storage_dir))
+    try:
+        with TestClient(app) as client:
+            upload = client.post(
+                f"/reports?patient_id={patient_id}&fixture=true",
+                files={"file": ("fixture.txt", b"synthetic", "text/plain")},
+            )
+            assert upload.status_code == 200
+            assert list(storage_dir.iterdir())
+
+            deleted = client.delete(f"/patients/{patient_id}")
+            assert deleted.status_code == 204
+            assert list(storage_dir.iterdir()) == []
+            assert client.get(f"/timeline?patient_id={patient_id}").json()["facts"] == []
+            assert client.delete(f"/patients/{patient_id}").status_code == 404
+    finally:
+        shutil.rmtree(storage_dir, ignore_errors=True)
+
+
+def test_production_rejects_static_token_configuration(monkeypatch) -> None:
+    monkeypatch.setenv("SMRITI_ENV", "production")
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    monkeypatch.setenv("AUTH_MODE", "token")
+    monkeypatch.setenv("RATE_LIMIT_BACKEND", "memory")
+    with TestClient(app) as client:
+        response = client.get("/timeline")
+        assert response.status_code == 503
+
+
+def test_production_ingestion_does_not_store_raw_extraction(monkeypatch) -> None:
+    patient_id = uuid4()
+    monkeypatch.setenv("SMRITI_ENV", "production")
+    monkeypatch.setenv("STORE_RAW_EXTRACTION", "false")
+    result = smriti_ingestion_graph.invoke(
+        {
+            "patient_id": str(patient_id),
+            "filename": "fixture.txt",
+            "content_type": "text/plain",
+            "source_type": "other",
+            "use_fixture": True,
+            "report_bytes": b"synthetic",
+            "report_is_scrubbed": True,
+            "pii_redactions": 0,
+            "pii_provider": "test",
+        }
+    )
+    assert result["memory_updated"] is True
+    with session_scope() as session:
+        report = session.exec(select(Report).where(Report.patient_id == patient_id)).one()
+        assert report.raw_extraction is None
+
+
 def test_empty_upload_is_rejected() -> None:
     with TestClient(app) as client:
         response = client.post(
@@ -115,14 +172,15 @@ def test_fixture_upload_is_rejected_in_production(monkeypatch) -> None:
             "/reports?fixture=true",
             files={"file": ("fixture.txt", b"synthetic", "text/plain")},
         )
-        assert response.status_code == 400
+        assert response.status_code == 503
         assert response.headers["X-Request-ID"]
 
 
 def test_production_upload_checks_file_signature(monkeypatch) -> None:
-    monkeypatch.setenv("SMRITI_ENV", "production")
+    monkeypatch.setenv("SMRITI_ENV", "development")
     monkeypatch.setenv("RATE_LIMIT_BACKEND", "memory")
     monkeypatch.setenv("AUTH_ENABLED", "false")
+    monkeypatch.setenv("UPLOAD_SIGNATURE_CHECK", "true")
     with TestClient(app) as client:
         response = client.post(
             "/reports",
