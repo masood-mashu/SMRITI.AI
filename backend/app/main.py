@@ -7,11 +7,12 @@ import time
 import json
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .db import check_database, init_db, session_scope
+from .config import validate_production_settings
 from .extractor import ExtractionError, ProviderConfigurationError
 from .generation import GenerationError
 from .graph import (
@@ -23,15 +24,18 @@ from .graph import (
     stream_emergency,
     stream_language,
 )
-from .repositories import get_fact_timeline, get_patient_contradictions, review_contradiction
+from .repositories import get_fact_timeline_page, get_patient_contradictions, review_contradiction
 from .models import HealthFact
 from .storage import StorageError, get_storage
-from .observability import audit_log, trace_span
+from .observability import audit_log, prometheus_metrics, record_metric, trace_span
 from .security import enforce_patient_access, require_security
 from .mcp_server import router as mcp_router
+from .privacy import PrivacyPolicyError, get_pii_scrubber
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    if os.getenv("SMRITI_VALIDATE_PRODUCTION", "false").lower() in {"1", "true", "yes", "on"}:
+        validate_production_settings()
     init_db()
     yield
 
@@ -76,10 +80,25 @@ async def request_observability(request: Request, call_next):
     response = None
     status_code = 500
     try:
+        declared_length = request.headers.get("content-length")
+        max_request_bytes = int(os.getenv("MAX_REQUEST_BYTES", str(MAX_UPLOAD_BYTES + 2 * 1024 * 1024)))
+        if declared_length and int(declared_length) > max_request_bytes:
+            response = JSONResponse(status_code=413, content={"detail": "Request body is too large"})
+            response.headers["X-Request-ID"] = request_id
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-Frame-Options"] = "DENY"
+            return response
         with trace_span("http.request", method=request.method, path=request.url.path):
             response = await call_next(request)
         status_code = response.status_code
+        record_metric("http_requests", method=request.method, path=request.url.path, status=str(status_code))
         response.headers["X-Request-ID"] = request_id
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        if os.getenv("SMRITI_ENV", "development").lower() == "production":
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response
     finally:
         audit_log(
@@ -178,6 +197,11 @@ def readiness() -> dict[str, str]:
     return {"status": "ready"}
 
 
+@app.get("/metrics", dependencies=[Depends(require_security)])
+def metrics() -> PlainTextResponse:
+    return PlainTextResponse(prometheus_metrics(), media_type="text/plain; version=0.0.4")
+
+
 @app.post("/reports", dependencies=[Depends(require_security)])
 async def upload_report(
     request: Request,
@@ -197,6 +221,19 @@ async def upload_report(
     )
     resolved_patient_id = resolve_patient_id(patient_id, request)
     try:
+        # Sanitize before persistence so raw uploaded PHI is never stored by the
+        # storage provider. Binary files are rejected in strict production mode.
+        scrubbed = get_pii_scrubber().scrub(
+            content=content,
+            filename=file.filename or "upload",
+            content_type=file.content_type or "application/octet-stream",
+        )
+    except PrivacyPolicyError as exc:
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    content = scrubbed.content
+    try:
         storage = get_storage()
         file_url = storage.store(
             filename=file.filename or "upload",
@@ -214,6 +251,9 @@ async def upload_report(
             "use_fixture": fixture,
             "file_url": file_url,
             "report_bytes": content,
+            "report_is_scrubbed": True,
+            "pii_redactions": scrubbed.redactions,
+            "pii_provider": scrubbed.provider,
         })
     except ProviderConfigurationError as exc:
         try:
@@ -232,14 +272,20 @@ async def upload_report(
 
 
 @app.get("/timeline", dependencies=[Depends(require_security)])
-def get_timeline(request: Request, patient_id: UUID | None = None) -> dict:
+def get_timeline(
+    request: Request,
+    patient_id: UUID | None = None,
+    offset: int = Query(default=0, ge=0, le=10_000),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> dict:
     resolved_id = UUID(resolve_patient_id(patient_id, request))
     with session_scope() as session:
-        facts = get_fact_timeline(session, resolved_id)
+        facts, total_facts = get_fact_timeline_page(session, resolved_id, offset=offset, limit=limit)
         contradictions = get_patient_contradictions(session, resolved_id)
     return {
         "patient_id": str(resolved_id),
         "facts": [serialize_fact(fact) for fact in facts],
+        "pagination": {"offset": offset, "limit": limit, "total": total_facts, "has_more": offset + len(facts) < total_facts},
         "contradictions": [
             {
                 "contradiction_id": str(item.contradiction_id),

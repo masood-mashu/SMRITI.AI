@@ -44,26 +44,36 @@ def stream_text(path: str, **kwargs):
     headers = dict(kwargs.pop("headers", {}))
     if API_TOKEN:
         headers["Authorization"] = f"Bearer {API_TOKEN}"
-    try:
-        response = requests.post(
-            f"{API_URL}{path}",
-            headers=headers,
-            timeout=API_TIMEOUT,
-            stream=True,
-            **kwargs,
-        )
-    except requests.RequestException as exc:
-        raise RuntimeError(f"Backend unavailable: {exc}") from exc
-    if not response.ok:
-        raise RuntimeError(f"Backend error ({response.status_code}): {response.text}")
-    for line in response.iter_lines(decode_unicode=True):
-        if not line or not line.startswith("data: "):
-            continue
-        event = json.loads(line[6:])
-        if event["type"] == "error":
-            raise RuntimeError(event["detail"])
-        if event["type"] == "chunk":
-            yield event["text"]
+    for attempt in range(2):
+        response = None
+        received_event = False
+        try:
+            response = requests.post(
+                f"{API_URL}{path}",
+                headers=headers,
+                timeout=API_TIMEOUT,
+                stream=True,
+                **kwargs,
+            )
+            if not response.ok:
+                raise RuntimeError(f"Backend error ({response.status_code}): {response.text}")
+            for line in response.iter_lines(decode_unicode=True):
+                if not line or not line.startswith("data: "):
+                    continue
+                received_event = True
+                event = json.loads(line[6:])
+                if event["type"] == "error":
+                    raise RuntimeError(event["detail"])
+                if event["type"] == "chunk":
+                    yield event["text"]
+            return
+        except requests.RequestException as exc:
+            if received_event or attempt == 1:
+                raise RuntimeError(f"Backend unavailable: {exc}") from exc
+            time.sleep(0.25)
+        finally:
+            if response is not None:
+                response.close()
 
 
 if "patient_id" not in st.session_state:

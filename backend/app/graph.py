@@ -9,7 +9,7 @@ from .db import session_scope
 from .extractor import ProviderConfigurationError, get_extractor
 from .generation import get_vertex_generator
 from .integrations import get_prompt_registry
-from .privacy import PrivacyPolicyError, get_pii_scrubber
+from .privacy import PrivacyPolicyError, ScrubResult, get_pii_scrubber
 from .repositories import (
     get_current_facts,
     get_emergency_facts,
@@ -24,6 +24,7 @@ class SmritiState(TypedDict, total=False):
     content_type: str
     source_type: str
     report_bytes: bytes
+    report_is_scrubbed: bool
     target_language: str
     extracted_facts: list[dict[str, Any]]
     memory_updated: bool
@@ -50,11 +51,18 @@ class SmritiState(TypedDict, total=False):
 def report_understanding_agent(state: SmritiState) -> dict[str, Any]:
     """Development extractor boundary; Gemini will replace this implementation."""
     try:
-        scrubbed = get_pii_scrubber().scrub(
-            content=state.get("report_bytes", b""),
-            filename=state.get("filename", "file"),
-            content_type=state.get("content_type", "application/octet-stream"),
-        )
+        if state.get("report_is_scrubbed"):
+            scrubbed = ScrubResult(
+                content=state.get("report_bytes", b""),
+                redactions=int(state.get("pii_redactions", 0)),
+                provider=str(state.get("pii_provider", "pre-scrubbed")),
+            )
+        else:
+            scrubbed = get_pii_scrubber().scrub(
+                content=state.get("report_bytes", b""),
+                filename=state.get("filename", "file"),
+                content_type=state.get("content_type", "application/octet-stream"),
+            )
     except (PrivacyPolicyError, RuntimeError) as exc:
         raise ProviderConfigurationError(str(exc)) from exc
     extraction = get_extractor(use_fixture=state.get("use_fixture", False)).extract(

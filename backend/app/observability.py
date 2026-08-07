@@ -5,12 +5,16 @@ import json
 import logging
 import time
 import os
+from collections import Counter
+from threading import Lock
 from typing import Any, Iterator
 
 from .integrations import get_audit_sink
 
 
 logger = logging.getLogger("smriti.audit")
+_metrics = Counter()
+_metrics_lock = Lock()
 _tracer = None
 try:
     from opentelemetry import trace
@@ -43,6 +47,29 @@ def audit_log(event: str, **fields: Any) -> None:
             sink.write(event, fields)
     except Exception as exc:
         logger.warning("audit_sink_error=%s", exc)
+
+
+def record_metric(name: str, value: int = 1, **labels: str) -> None:
+    """Record low-cardinality process metrics without storing request contents."""
+    key = name + "{" + ",".join(f"{k}={labels[k]}" for k in sorted(labels)) + "}"
+    with _metrics_lock:
+        _metrics[key] += value
+
+
+def prometheus_metrics() -> str:
+    with _metrics_lock:
+        snapshot = dict(_metrics)
+    lines = ["# TYPE smriti_events_total counter"]
+    for key, value in sorted(snapshot.items()):
+        event, raw_labels = key.split("{", 1)
+        labels = raw_labels[:-1]
+        pairs = [f'event="{event}"']
+        for item in labels.split(",") if labels else []:
+            label, label_value = item.split("=", 1)
+            escaped = label_value.replace(chr(92), chr(92) + chr(92)).replace(chr(34), chr(92) + chr(34))
+            pairs.append(f'{label}="{escaped}"')
+        lines.append(f"smriti_events_total{{{','.join(pairs)}}} {value}")
+    return "\n".join(lines) + "\n"
 
 
 @contextmanager

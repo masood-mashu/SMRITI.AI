@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import date
 import os
 import time
+import random
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field, ValidationError
@@ -172,7 +173,7 @@ treatment, or infer missing information. Return JSON with this exact shape:
             except (TimeoutError, ConnectionError) as exc:
                 if attempt == 2:
                     raise ExtractionError(f"Vertex Gemini request failed after retries: {exc}") from exc
-                time.sleep(0.2 * (2**attempt))
+                time.sleep(random.uniform(0.15, 0.35) * (2**attempt))
             except Exception as exc:
                 raise ExtractionError(f"Vertex Gemini request failed: {exc}") from exc
         if response is None:

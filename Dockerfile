@@ -11,5 +11,10 @@ COPY infra ./infra
 
 RUN pip install --no-cache-dir -r requirements.lock && pip install --no-cache-dir --no-deps .
 
+RUN addgroup --system smriti && adduser --system --ingroup smriti smriti \
+    && mkdir -p /app/.data/uploads \
+    && chown -R smriti:smriti /app
+USER smriti
+
 EXPOSE 8000
 CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -9,6 +9,7 @@ from backend.app.extractor import (
 )
 from backend.app.privacy import GemmaPiiScrubber, PrivacyPolicyError, RegexPiiScrubber, VertexGemmaPiiScrubber
 from backend.app.generation import GenerationError, VertexTextGenerator
+from backend.app.config import validate_production_settings
 
 
 def test_fixture_and_gemini_provider_contracts() -> None:
@@ -188,3 +189,12 @@ def test_vertex_text_generator_wraps_request_errors() -> None:
 
     with pytest.raises(GenerationError, match="Vertex output generation failed"):
         VertexTextGenerator(model="test-model", client=FakeClient()).generate(prompt="test")
+
+
+def test_production_configuration_fails_closed(monkeypatch) -> None:
+    monkeypatch.setenv("SMRITI_ENV", "production")
+    monkeypatch.setenv("SMRITI_VALIDATE_PRODUCTION", "true")
+    for name in ("AUTH_ENABLED", "AUTH_MODE", "PHI_STRICT", "UPLOAD_SIGNATURE_CHECK", "STORAGE_PROVIDER", "RATE_LIMIT_BACKEND"):
+        monkeypatch.delenv(name, raising=False)
+    with pytest.raises(RuntimeError, match="Invalid production configuration"):
+        validate_production_settings()

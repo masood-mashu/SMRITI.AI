@@ -40,13 +40,23 @@ services:
   api:
     build: .
     environment:
-      SMRITI_ENV: production
+      # Local Compose defaults to development so the synthetic fixture button
+      # works. Set SMRITI_ENV=production for a production-shaped run.
+      SMRITI_ENV: ${SMRITI_ENV:-development}
       DATABASE_URL: postgresql+psycopg://smriti:smriti@postgres:5432/smriti
       DB_AUTO_CREATE: "false"
       AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      AUTH_MODE: token
       SMRITI_API_TOKEN: ${SMRITI_API_TOKEN:?Set SMRITI_API_TOKEN before starting production services}
+      EXTRACTION_PROVIDER: ${EXTRACTION_PROVIDER:-stub}
       RATE_LIMIT_BACKEND: redis
       REDIS_URL: redis://redis:6379/0
+      STORAGE_PROVIDER: local
+      LOCAL_STORAGE_DIR: /app/.data/uploads
+      STORAGE_ENCRYPTION_REQUIRED: "true"
+      STORAGE_ENCRYPTION_KEY: ${STORAGE_ENCRYPTION_KEY:?Set STORAGE_ENCRYPTION_KEY before starting production services}
+      STORAGE_RETENTION_DAYS: ${STORAGE_RETENTION_DAYS:-30}
+      UPLOAD_SIGNATURE_CHECK: "true"
     ports:
       - "8000:8000"
     depends_on:

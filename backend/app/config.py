@@ -46,3 +46,26 @@ class Settings:
 
 
 settings = Settings.from_env()
+
+
+def validate_production_settings() -> None:
+    """Fail closed when an explicitly validated production deployment is misconfigured."""
+    if os.getenv("SMRITI_ENV", "development").lower() != "production":
+        return
+    required = {
+        "AUTH_ENABLED": os.getenv("AUTH_ENABLED", "true").lower() in {"1", "true", "yes", "on"},
+        "AUTH_MODE": os.getenv("AUTH_MODE", "oidc").lower() == "oidc",
+        "PHI_STRICT": os.getenv("PHI_STRICT", "true").lower() in {"1", "true", "yes", "on"},
+        "UPLOAD_SIGNATURE_CHECK": os.getenv("UPLOAD_SIGNATURE_CHECK", "true").lower()
+        in {"1", "true", "yes", "on"},
+        "STORAGE_PROVIDER": os.getenv("STORAGE_PROVIDER", "").lower() == "gcs",
+        "RATE_LIMIT_BACKEND": os.getenv("RATE_LIMIT_BACKEND", "").lower() == "redis",
+    }
+    missing = [name for name, valid in required.items() if not valid]
+    for name in ("DATABASE_URL", "REDIS_URL", "OIDC_ISSUER", "OIDC_AUDIENCE", "GCS_BUCKET", "GCS_KMS_KEY_NAME"):
+        if not os.getenv(name):
+            missing.append(name)
+    if os.getenv("DB_AUTO_CREATE", "false").lower() in {"1", "true", "yes", "on"}:
+        missing.append("DB_AUTO_CREATE=false")
+    if missing:
+        raise RuntimeError("Invalid production configuration: " + ", ".join(sorted(set(missing))))

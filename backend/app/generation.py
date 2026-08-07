@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 import os
 import time
+import random
 from collections.abc import Iterator
 from typing import Any, Protocol
 
@@ -74,7 +75,7 @@ class VertexTextGenerator:
             except (TimeoutError, ConnectionError) as exc:
                 if attempt == 2:
                     raise GenerationError(f"Vertex output generation failed after retries: {exc}") from exc
-                time.sleep(0.2 * (2**attempt))
+                time.sleep(random.uniform(0.15, 0.35) * (2**attempt))
             except Exception as exc:
                 raise GenerationError(f"Vertex output generation failed: {exc}") from exc
         if response is None:
@@ -105,7 +106,7 @@ class VertexTextGenerator:
             except (TimeoutError, ConnectionError) as exc:
                 if attempt == 2:
                     raise GenerationError(f"Vertex streaming failed after retries: {exc}") from exc
-                time.sleep(0.2 * (2**attempt))
+                time.sleep(random.uniform(0.15, 0.35) * (2**attempt))
             except Exception as exc:
                 raise GenerationError(f"Vertex streaming failed: {exc}") from exc
 

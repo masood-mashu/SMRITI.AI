@@ -5,6 +5,7 @@ import json
 from typing import Any
 from uuid import UUID, uuid4
 
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from .models import Contradiction, HealthFact, Patient, Report, utc_now
@@ -180,3 +181,22 @@ def get_fact_timeline(session: Session, patient_id: UUID) -> list[HealthFact]:
             ).order_by(HealthFact.effective_date, HealthFact.recorded_at)
         )
     )
+
+
+def get_fact_timeline_page(
+    session: Session, patient_id: UUID, *, offset: int = 0, limit: int = 100
+) -> tuple[list[HealthFact], int]:
+    """Return a bounded timeline page and its total size."""
+    total = session.exec(
+        select(func.count()).select_from(HealthFact).where(HealthFact.patient_id == patient_id)
+    ).one()
+    facts = list(
+        session.exec(
+            select(HealthFact)
+            .where(HealthFact.patient_id == patient_id)
+            .order_by(HealthFact.effective_date, HealthFact.recorded_at)
+            .offset(offset)
+            .limit(limit)
+        )
+    )
+    return facts, int(total)

@@ -36,6 +36,48 @@ def test_fixture_upload_populates_timeline() -> None:
         assert timeline.json()["contradictions"] == []
 
 
+def test_timeline_is_paginated() -> None:
+    patient_id = uuid4()
+    with TestClient(app) as client:
+        upload = client.post(
+            f"/reports?patient_id={patient_id}&fixture=true",
+            files={"file": ("fixture.pdf", b"synthetic", "application/pdf")},
+        )
+        assert upload.status_code == 200
+        response = client.get(f"/timeline?patient_id={patient_id}&limit=1")
+        assert response.status_code == 200
+        payload = response.json()
+        assert len(payload["facts"]) == 1
+        assert payload["pagination"] == {"offset": 0, "limit": 1, "total": 3, "has_more": True}
+
+
+def test_upload_persists_scrubbed_text_only(monkeypatch) -> None:
+    storage_dir = Path(".data") / f"test-scrubbed-upload-{uuid4()}"
+    monkeypatch.setenv("SMRITI_ENV", "development")
+    monkeypatch.setenv("STORAGE_PROVIDER", "local")
+    monkeypatch.setenv("LOCAL_STORAGE_DIR", str(storage_dir))
+    monkeypatch.setenv("PII_PROVIDER", "regex")
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                f"/reports?patient_id={uuid4()}&fixture=true",
+                files={"file": ("note.txt", b"Contact patient@example.com", "text/plain")},
+            )
+            assert response.status_code == 200
+            stored = next(storage_dir.iterdir()).read_bytes()
+            assert b"patient@example.com" not in stored
+            assert b"[REDACTED]" in stored
+    finally:
+        shutil.rmtree(storage_dir, ignore_errors=True)
+
+
+def test_request_body_limit_is_enforced(monkeypatch) -> None:
+    monkeypatch.setenv("MAX_REQUEST_BYTES", "2")
+    with TestClient(app) as client:
+        response = client.post("/health", content=b"123")
+        assert response.status_code == 413
+
+
 def test_empty_upload_is_rejected() -> None:
     with TestClient(app) as client:
         response = client.post(

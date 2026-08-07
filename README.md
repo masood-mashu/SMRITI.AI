@@ -52,7 +52,10 @@ docker compose up --build
 
 This starts PostgreSQL, Redis, an Alembic migration job, FastAPI, and
 Streamlit. The API is available at `http://localhost:8000`; the frontend is
-available at `http://localhost:8501`.
+available at `http://localhost:8501`. Compose defaults the API to development
+mode so the **Use synthetic development fixture** option works. A real upload
+still requires Vertex configuration. To exercise the production fail-closed
+configuration instead, set `$env:SMRITI_ENV="production"` before starting.
 
 ## API
 

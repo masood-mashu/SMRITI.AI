@@ -7,21 +7,56 @@ spec:
     metadata:
       annotations:
         run.googleapis.com/execution-environment: gen2
+        autoscaling.knative.dev/minScale: "1"
     spec:
       serviceAccountName: SMRITI_RUNTIME_SERVICE_ACCOUNT
+      containerConcurrency: 20
+      timeoutSeconds: 300
       containers:
         - image: REGION-docker.pkg.dev/PROJECT/smriti/api:TAG
           ports:
-            - containerPort: 8000
+            - containerPort: 8080
+          command: ["uvicorn"]
+          args: ["backend.app.main:app", "--host", "0.0.0.0", "--port", "8080"]
           env:
             - name: SMRITI_ENV
               value: production
+            - name: SMRITI_VALIDATE_PRODUCTION
+              value: "true"
             - name: DB_AUTO_CREATE
               value: "false"
             - name: AUTH_ENABLED
               value: "true"
             - name: AUTH_MODE
               value: oidc
+            - name: PHI_STRICT
+              value: "true"
+            - name: UPLOAD_SIGNATURE_CHECK
+              value: "true"
+            - name: EXTRACTION_PROVIDER
+              value: vertex
+            - name: OUTPUT_PROVIDER
+              value: vertex
+            - name: PII_PROVIDER
+              value: vertex_gemma
+            - name: GOOGLE_CLOUD_PROJECT
+              value: PROJECT
+            - name: GOOGLE_CLOUD_LOCATION
+              value: global
+            - name: STORAGE_PROVIDER
+              value: gcs
+            - name: GCS_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: smriti-gcs-bucket
+                  key: latest
+            - name: GCS_KMS_KEY_REQUIRED
+              value: "true"
+            - name: GCS_KMS_KEY_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: smriti-gcs-kms-key
+                  key: latest
             - name: RATE_LIMIT_BACKEND
               value: redis
             - name: DATABASE_URL
@@ -48,3 +83,14 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 18
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            periodSeconds: 30

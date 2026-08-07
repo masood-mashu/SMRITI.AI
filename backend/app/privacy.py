@@ -18,6 +18,10 @@ class PrivacyPolicyError(RuntimeError):
     """Raised when configured privacy policy cannot safely process an upload."""
 
 
+def is_text_upload(*, filename: str, content_type: str) -> bool:
+    return content_type.startswith("text/") or filename.lower().endswith((".txt", ".csv"))
+
+
 class PiiScrubber(Protocol):
     def scrub(self, *, content: bytes, filename: str, content_type: str) -> ScrubResult:
         """Return content safe to pass to the report extractor."""
@@ -35,7 +39,7 @@ class RegexPiiScrubber:
         self.strict = strict
 
     def scrub(self, *, content: bytes, filename: str, content_type: str) -> ScrubResult:
-        if not (content_type.startswith("text/") or filename.lower().endswith((".txt", ".csv"))):
+        if not is_text_upload(filename=filename, content_type=content_type):
             if self.strict:
                 raise PrivacyPolicyError("Strict PHI mode requires a multimodal PII scrubber for this file")
             return ScrubResult(content=content, redactions=0, provider="regex-dev")
@@ -97,7 +101,7 @@ class VertexGemmaPiiScrubber:
     def scrub(self, *, content: bytes, filename: str, content_type: str) -> ScrubResult:
         # Gemma is used for text redaction here; binary reports remain protected
         # by the deterministic fallback until a multimodal deployment is set up.
-        if not (content_type.startswith("text/") or filename.lower().endswith((".txt", ".csv"))):
+        if not is_text_upload(filename=filename, content_type=content_type):
             result = self.fallback.scrub(content=content, filename=filename, content_type=content_type)
             return ScrubResult(result.content, result.redactions, "vertex-gemma-bypass+" + result.provider)
         prompt = (

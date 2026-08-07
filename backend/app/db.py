@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 from collections.abc import Iterator
+import os
 
 from sqlalchemy import inspect, text
 from sqlmodel import Session, SQLModel, create_engine
@@ -13,10 +14,19 @@ from .config import settings
 DATABASE_URL = settings.database_url
 DB_AUTO_CREATE = settings.db_auto_create
 _is_sqlite = DATABASE_URL.startswith("sqlite")
+engine_options = {
+    "echo": False,
+    "pool_pre_ping": True,
+}
+if not _is_sqlite:
+    engine_options.update(
+        pool_size=max(1, int(os.getenv("DB_POOL_SIZE", "5"))),
+        max_overflow=max(0, int(os.getenv("DB_MAX_OVERFLOW", "10"))),
+        pool_timeout=max(1, int(os.getenv("DB_POOL_TIMEOUT_SECONDS", "30"))),
+    )
 engine = create_engine(
     DATABASE_URL,
-    echo=False,
-    pool_pre_ping=True,
+    **engine_options,
     connect_args={"check_same_thread": False} if _is_sqlite else {},
 )
 _initialized = False

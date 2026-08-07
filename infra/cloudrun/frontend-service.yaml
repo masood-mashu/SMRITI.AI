@@ -8,9 +8,10 @@ spec:
       serviceAccountName: SMRITI_RUNTIME_SERVICE_ACCOUNT
       containers:
         - image: REGION-docker.pkg.dev/PROJECT/smriti/frontend:TAG
-          command: ["streamlit", "run", "frontend/streamlit_app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+          command: ["sh", "-c"]
+          args: ["streamlit run frontend/streamlit_app.py --server.address=0.0.0.0 --server.port=${PORT:-8080}"]
           ports:
-            - containerPort: 8501
+            - containerPort: 8080
           env:
             - name: API_URL
               value: https://SMRITI_API_HOST
