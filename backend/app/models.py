@@ -70,3 +70,7 @@ class Contradiction(SQLModel, table=True):
     description: str = Field(sa_column=Column(Text, nullable=False))
     detected_at: datetime = Field(default_factory=utc_now, nullable=False)
     resolved: bool = Field(default=False, nullable=False)
+    review_decision: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    reviewer_note: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    reviewed_at: Optional[datetime] = Field(default=None, nullable=True)
+    reviewed_by: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))

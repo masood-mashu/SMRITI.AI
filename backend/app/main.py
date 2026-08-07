@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field
 
 from .db import check_database, init_db, session_scope
 from .extractor import ExtractionError, ProviderConfigurationError
@@ -22,7 +23,7 @@ from .graph import (
     stream_emergency,
     stream_language,
 )
-from .repositories import get_fact_timeline, get_patient_contradictions
+from .repositories import get_fact_timeline, get_patient_contradictions, review_contradiction
 from .models import HealthFact
 from .storage import StorageError, get_storage
 from .observability import audit_log, trace_span
@@ -42,6 +43,11 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = {"application/pdf", "image/png", "image/jpeg", "text/plain"}
 ALLOWED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".txt"}
 SUPPORTED_LANGUAGES = {"en", "hi", "kn"}
+
+
+class ContradictionReviewRequest(BaseModel):
+    decision: Literal["confirm_older", "confirm_newer", "leave_unresolved"]
+    reviewer_note: str | None = Field(default=None, max_length=2000)
 
 
 @app.exception_handler(GenerationError)
@@ -242,6 +248,10 @@ def get_timeline(request: Request, patient_id: UUID | None = None) -> dict:
                 "description": item.description,
                 "detected_at": item.detected_at.isoformat(),
                 "resolved": item.resolved,
+                "review_decision": item.review_decision,
+                "reviewer_note": item.reviewer_note,
+                "reviewed_at": item.reviewed_at.isoformat() if item.reviewed_at else None,
+                "reviewed_by": item.reviewed_by,
             }
             for item in contradictions
         ],
@@ -252,6 +262,45 @@ def get_timeline(request: Request, patient_id: UUID | None = None) -> dict:
 def generate_doctor_brief(request: Request, patient_id: UUID | None = None) -> dict:
     result = doctor_brief_graph.invoke({"patient_id": resolve_patient_id(patient_id, request)})
     return {"status": "generated", "graph": result}
+
+
+@app.post("/contradictions/{contradiction_id}/review", dependencies=[Depends(require_security)])
+def review_contradiction_endpoint(
+    contradiction_id: UUID,
+    review: ContradictionReviewRequest,
+    request: Request,
+    patient_id: UUID | None = None,
+) -> dict:
+    resolved_patient_id = UUID(resolve_patient_id(patient_id, request))
+    auth = getattr(request.state, "auth", None)
+    reviewer = auth.subject if auth is not None else "development"
+    with session_scope() as session:
+        contradiction = review_contradiction(
+            session,
+            contradiction_id=contradiction_id,
+            patient_id=resolved_patient_id,
+            decision=review.decision,
+            reviewer=reviewer,
+            reviewer_note=review.reviewer_note,
+        )
+        if contradiction is None:
+            raise HTTPException(status_code=404, detail="Contradiction not found")
+    audit_log(
+        "contradiction_reviewed",
+        contradiction_id=str(contradiction_id),
+        patient_id=str(resolved_patient_id),
+        decision=review.decision,
+        reviewer=reviewer,
+    )
+    return {
+        "status": "reviewed",
+        "contradiction_id": str(contradiction.contradiction_id),
+        "patient_id": str(contradiction.patient_id),
+        "resolved": contradiction.resolved,
+        "decision": contradiction.review_decision,
+        "reviewed_by": contradiction.reviewed_by,
+        "reviewed_at": contradiction.reviewed_at.isoformat() if contradiction.reviewed_at else None,
+    }
 
 
 @app.post("/emergency", dependencies=[Depends(require_security)])

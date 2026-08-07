@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from sqlmodel import Session, select
 
-from .models import Contradiction, HealthFact, Patient, Report
+from .models import Contradiction, HealthFact, Patient, Report, utc_now
 
 
 def json_safe(value: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -147,6 +147,29 @@ def get_patient_contradictions(session: Session, patient_id: UUID) -> list[Contr
             ).order_by(Contradiction.detected_at)
         )
     )
+
+
+def review_contradiction(
+    session: Session,
+    *,
+    contradiction_id: UUID,
+    patient_id: UUID,
+    decision: str,
+    reviewer: str,
+    reviewer_note: str | None = None,
+) -> Contradiction | None:
+    """Record a human review without changing either historical fact."""
+    contradiction = session.get(Contradiction, contradiction_id)
+    if contradiction is None or contradiction.patient_id != patient_id:
+        return None
+    contradiction.review_decision = decision
+    contradiction.reviewer_note = reviewer_note
+    contradiction.reviewed_at = utc_now()
+    contradiction.reviewed_by = reviewer
+    contradiction.resolved = decision != "leave_unresolved"
+    session.add(contradiction)
+    session.flush()
+    return contradiction
 
 
 def get_fact_timeline(session: Session, patient_id: UUID) -> list[HealthFact]:

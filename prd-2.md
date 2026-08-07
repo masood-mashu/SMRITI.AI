@@ -80,6 +80,7 @@ The system is divided into five logical layers:
 *   `POST /emergency/stream`: SSE endpoint for emergency cards.
 *   `POST /translate/stream`: SSE endpoint for multi-language support.
 *   `POST /mcp`: JSON-RPC endpoint for context retrieval.
+*   `POST /contradictions/{id}/review`: Authorized HITL review decision.
 
 ## 11. Security Requirements
 *   **Identity:** OIDC JWT validation (Issuer, Audience, Expiry).
@@ -124,7 +125,7 @@ The system is divided into five logical layers:
 | FR-05 | Generate on-demand outputs | Doctor Brief, Emergency, and Language endpoints read current memory without mutating facts | `backend/app/graph.py`, `backend/app/main.py` |
 | FR-06 | Stream outputs | `/brief/stream`, `/emergency/stream`, and `/translate/stream` emit SSE chunks and a terminal event | `backend/app/main.py`, `frontend/streamlit_app.py` |
 | FR-07 | Secure context access | MCP tools validate UUIDs and enforce OIDC patient ownership before database access | `backend/app/mcp_server.py`, `tests/test_mcp.py` |
-| FR-08 | Human contradiction review | Authorized users can inspect an unresolved contradiction and record a review decision without deleting facts | Arc-2 HITL flow; endpoint completion tracked as Phase 2 work |
+| FR-08 | Human contradiction review | Authorized users can inspect an unresolved contradiction and record `confirm_older`, `confirm_newer`, or `leave_unresolved` without deleting facts | `POST /contradictions/{id}/review`, `backend/app/repositories.py`, API tests |
 | NFR-01 | Patient isolation | Cross-patient access returns 403; production requests require OIDC or an explicitly configured service token | `backend/app/security.py`, `tests/test_security.py` |
 | NFR-02 | Reliability | PostgreSQL migrations pass upgrade/downgrade/reapply; Redis is the production rate-limit backend | `.github/workflows/ci.yml`, `infra/alembic/` |
 | NFR-03 | Privacy and retention | Production local storage requires an encryption key; retention cleanup and deletion are tested; audit logs exclude report contents | `backend/app/storage.py`, `tests/test_storage.py` |

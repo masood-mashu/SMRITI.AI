@@ -64,6 +64,7 @@ available at `http://localhost:8501`.
 - `POST /emergency` - generate Emergency output on demand
 - `POST /translate?language=hi` - generate Language output on demand
 - `POST /mcp` - MCP-compatible JSON-RPC endpoint
+- `POST /contradictions/{id}/review` - record an authorized contradiction review decision
 
 Protected endpoints accept `Authorization: Bearer <token>` when authentication
 is enabled. Production OIDC mode requires a JWT `patient_id` claim and rejects

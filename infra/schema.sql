@@ -41,5 +41,9 @@ CREATE TABLE contradictions (
     fact_id_newer    UUID NOT NULL REFERENCES health_facts(fact_id),
     description      TEXT NOT NULL,
     detected_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    resolved         BOOLEAN NOT NULL DEFAULT false
+    resolved         BOOLEAN NOT NULL DEFAULT false,
+    review_decision  TEXT,
+    reviewer_note    TEXT,
+    reviewed_at      TIMESTAMPTZ,
+    reviewed_by      TEXT
 );

@@ -1,10 +1,16 @@
 from uuid import uuid4
+from datetime import date
 import shutil
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlmodel import select
 
+from backend.app.db import session_scope
 from backend.app.main import app
+from backend.app.models import Contradiction
+from backend.app.repositories import persist_report_and_facts
+from backend.app.security import rate_limiter
 
 
 def test_fixture_upload_populates_timeline() -> None:
@@ -88,3 +94,44 @@ def test_translation_rejects_unsupported_language() -> None:
         response = client.post("/translate?language=fr")
         assert response.status_code == 422
         assert "Unsupported language" in response.json()["detail"]
+
+
+def test_contradiction_review_records_decision_without_mutating_facts() -> None:
+    rate_limiter._events.clear()
+    patient_id = uuid4()
+    fact = {
+        "fact_type": "medication",
+        "fact_key": "Medication dose",
+        "fact_value": "5 mg",
+        "effective_date": date(2026, 1, 1),
+    }
+    changed = {**fact, "fact_value": "10 mg"}
+    with session_scope() as session:
+        persist_report_and_facts(
+            session,
+            patient_id=patient_id,
+            source_type="prescription",
+            raw_extraction={"facts": [fact]},
+            extracted_facts=[fact],
+        )
+        persist_report_and_facts(
+            session,
+            patient_id=patient_id,
+            source_type="prescription",
+            raw_extraction={"facts": [changed]},
+            extracted_facts=[changed],
+        )
+        contradiction_id = session.exec(
+            select(Contradiction.contradiction_id).where(Contradiction.patient_id == patient_id)
+        ).one()
+
+    with TestClient(app) as client:
+        response = client.post(
+            f"/contradictions/{contradiction_id}/review?patient_id={patient_id}",
+            json={"decision": "confirm_newer", "reviewer_note": "Reviewed source prescription."},
+        )
+        assert response.status_code == 200
+        assert response.json()["resolved"] is True
+        timeline = client.get(f"/timeline?patient_id={patient_id}").json()
+        assert len(timeline["facts"]) == 2
+        assert timeline["contradictions"] == []
