@@ -62,6 +62,7 @@ configuration instead, set `$env:SMRITI_ENV="production"` before starting.
 - `GET /health` and `GET /health/live` - liveness
 - `GET /health/ready` - database readiness
 - `POST /reports` - upload a report; use `fixture=true` only for development
+- `GET /ingestion-jobs/{id}` - retrieve ingestion status for an authorized patient
 - `GET /timeline` - current and superseded facts plus contradictions
 - `DELETE /patients/{id}` - erase authorized patient records and stored reports
 - `GET /metrics` - protected Prometheus-compatible process counters

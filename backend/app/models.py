@@ -34,6 +34,20 @@ class Report(SQLModel, table=True):
     )
 
 
+class IngestionJob(SQLModel, table=True):
+    __tablename__ = "ingestion_jobs"
+    __table_args__ = (Index("idx_ingestion_jobs_patient_status", "patient_id", "status", "created_at"),)
+    job_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    patient_id: UUID = Field(foreign_key="patients.patient_id", nullable=False)
+    report_id: Optional[UUID] = Field(default=None, foreign_key="reports.report_id")
+    file_url: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    source_type: str = Field(sa_column=Column(Text, nullable=False))
+    status: str = Field(default="pending", sa_column=Column(Text, nullable=False))
+    error: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    created_at: datetime = Field(default_factory=utc_now, nullable=False)
+    updated_at: datetime = Field(default_factory=utc_now, nullable=False)
+
+
 class HealthFact(SQLModel, table=True):
     __tablename__ = "health_facts"
     __table_args__ = (

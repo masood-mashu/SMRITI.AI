@@ -92,6 +92,10 @@ def test_patient_deletion_removes_database_records_and_upload(monkeypatch) -> No
             )
             assert upload.status_code == 200
             assert list(storage_dir.iterdir())
+            job_id = upload.json()["job_id"]
+            job = client.get(f"/ingestion-jobs/{job_id}?patient_id={patient_id}")
+            assert job.status_code == 200
+            assert job.json()["status"] == "succeeded"
 
             deleted = client.delete(f"/patients/{patient_id}")
             assert deleted.status_code == 204

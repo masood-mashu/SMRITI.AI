@@ -26,10 +26,13 @@ from .graph import (
     stream_language,
 )
 from .repositories import (
+    create_ingestion_job,
     delete_patient_data,
     get_fact_timeline_page,
+    get_ingestion_job,
     get_patient_contradictions,
     review_contradiction,
+    update_ingestion_job,
 )
 from .models import HealthFact
 from .storage import StorageError, get_storage
@@ -249,6 +252,24 @@ def delete_patient(patient_id: UUID, request: Request) -> Response:
     return Response(status_code=204)
 
 
+@app.get("/ingestion-jobs/{job_id}", dependencies=[Depends(require_security)])
+def ingestion_job_status(job_id: UUID, request: Request, patient_id: UUID | None = None) -> dict:
+    resolved_patient_id = UUID(resolve_patient_id(patient_id, request))
+    with session_scope() as session:
+        job = get_ingestion_job(session, job_id=job_id, patient_id=resolved_patient_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Ingestion job not found")
+    return {
+        "job_id": str(job.job_id),
+        "patient_id": str(job.patient_id),
+        "report_id": str(job.report_id) if job.report_id else None,
+        "status": job.status,
+        "error": job.error,
+        "created_at": job.created_at.isoformat(),
+        "updated_at": job.updated_at.isoformat(),
+    }
+
+
 @app.post("/reports", dependencies=[Depends(require_security)])
 async def upload_report(
     request: Request,
@@ -289,6 +310,14 @@ async def upload_report(
         )
     except StorageError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    with session_scope() as session:
+        job = create_ingestion_job(
+            session,
+            patient_id=UUID(resolved_patient_id),
+            source_type=source_type,
+            file_url=file_url,
+        )
+    job_id = job.job_id
     try:
         result = smriti_ingestion_graph.invoke({
             "patient_id": resolved_patient_id,
@@ -303,19 +332,30 @@ async def upload_report(
             "pii_provider": scrubbed.provider,
         })
     except ProviderConfigurationError as exc:
+        with session_scope() as session:
+            update_ingestion_job(session, job_id, status="failed", error=str(exc))
         try:
             storage.delete(file_url)
         except StorageError:
             pass
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ExtractionError as exc:
+        with session_scope() as session:
+            update_ingestion_job(session, job_id, status="failed", error=str(exc))
         try:
             storage.delete(file_url)
         except StorageError:
             pass
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    with session_scope() as session:
+        update_ingestion_job(
+            session,
+            job_id,
+            status="succeeded",
+            report_id=UUID(result["report_id"]),
+        )
     result.pop("report_bytes", None)
-    return {"status": "accepted", "filename": file.filename, "graph": result}
+    return {"status": "accepted", "job_id": str(job_id), "job_status": "succeeded", "filename": file.filename, "graph": result}
 
 
 @app.get("/timeline", dependencies=[Depends(require_security)])

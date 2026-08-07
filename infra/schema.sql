@@ -15,6 +15,18 @@ CREATE TABLE reports (
     raw_extraction JSONB
 );
 
+CREATE TABLE ingestion_jobs (
+    job_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id  UUID NOT NULL REFERENCES patients(patient_id),
+    report_id   UUID REFERENCES reports(report_id),
+    file_url    TEXT,
+    source_type TEXT NOT NULL,
+    status      TEXT NOT NULL,
+    error       TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE health_facts (
     fact_id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     patient_id             UUID NOT NULL REFERENCES patients(patient_id),
@@ -34,6 +46,7 @@ CREATE TABLE health_facts (
 CREATE UNIQUE INDEX idx_facts_current ON health_facts (patient_id, fact_key) WHERE superseded_by IS NULL;
 CREATE INDEX idx_facts_timeline ON health_facts (patient_id, effective_date);
 CREATE INDEX idx_reports_patient ON reports (patient_id, uploaded_at);
+CREATE INDEX idx_ingestion_jobs_patient_status ON ingestion_jobs (patient_id, status, created_at);
 
 CREATE TABLE contradictions (
     contradiction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

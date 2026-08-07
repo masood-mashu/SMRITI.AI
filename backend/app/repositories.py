@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from .models import Contradiction, HealthFact, Patient, Report, utc_now
+from .models import Contradiction, HealthFact, IngestionJob, Patient, Report, utc_now
 
 
 def json_safe(value: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -24,6 +24,43 @@ def ensure_patient(session: Session, patient_id: UUID, display_name: str = "Smri
         session.add(patient)
         session.flush()
     return patient
+
+
+def create_ingestion_job(
+    session: Session, *, patient_id: UUID, source_type: str, file_url: str | None
+) -> IngestionJob:
+    ensure_patient(session, patient_id)
+    job = IngestionJob(patient_id=patient_id, source_type=source_type, file_url=file_url, status="running")
+    session.add(job)
+    session.flush()
+    return job
+
+
+def update_ingestion_job(
+    session: Session,
+    job_id: UUID,
+    *,
+    status: str,
+    report_id: UUID | None = None,
+    error: str | None = None,
+) -> IngestionJob | None:
+    job = session.get(IngestionJob, job_id)
+    if job is None:
+        return None
+    job.status = status
+    job.report_id = report_id
+    job.error = error
+    job.updated_at = utc_now()
+    session.add(job)
+    session.flush()
+    return job
+
+
+def get_ingestion_job(session: Session, *, job_id: UUID, patient_id: UUID) -> IngestionJob | None:
+    job = session.get(IngestionJob, job_id)
+    if job is None or job.patient_id != patient_id:
+        return None
+    return job
 
 
 def persist_report_and_facts(
@@ -157,6 +194,7 @@ def delete_patient_data(session: Session, patient_id: UUID) -> list[str] | None:
         return None
 
     reports = list(session.exec(select(Report).where(Report.patient_id == patient_id)))
+    jobs = list(session.exec(select(IngestionJob).where(IngestionJob.patient_id == patient_id)))
     facts = list(session.exec(select(HealthFact).where(HealthFact.patient_id == patient_id)))
     contradictions = list(session.exec(select(Contradiction).where(Contradiction.patient_id == patient_id)))
 
@@ -169,6 +207,8 @@ def delete_patient_data(session: Session, patient_id: UUID) -> list[str] | None:
         session.delete(contradiction)
     for fact in facts:
         session.delete(fact)
+    for job in jobs:
+        session.delete(job)
     for report in reports:
         session.delete(report)
     session.delete(patient)
