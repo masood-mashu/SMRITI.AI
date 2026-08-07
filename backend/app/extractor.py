@@ -202,7 +202,9 @@ def get_extractor(*, use_fixture: bool) -> ReportExtractor:
         return FixtureExtractor()
     if os.getenv("EXTRACTION_PROVIDER", "stub").lower() == "vertex":
         return VertexGeminiExtractor()
-    return GeminiExtractorStub()
+    raise ProviderConfigurationError(
+        "Real report extraction is not configured; set EXTRACTION_PROVIDER=vertex or use fixture mode in development"
+    )
 
 
 def extract_report(*, filename: str, use_fixture: bool = False) -> dict[str, Any]:

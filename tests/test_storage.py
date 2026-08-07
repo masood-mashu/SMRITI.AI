@@ -29,6 +29,17 @@ def test_local_storage_encrypts_uploaded_bytes() -> None:
         shutil.rmtree(tmp_path)
 
 
+def test_local_storage_deletes_stored_reference() -> None:
+    tmp_path = storage_root()
+    try:
+        storage = LocalFileStorage(tmp_path)
+        reference = storage.store(filename="report.txt", content=b"private report", content_type="text/plain")
+        storage.delete(reference)
+        assert list(tmp_path.iterdir()) == []
+    finally:
+        shutil.rmtree(tmp_path)
+
+
 def test_production_storage_requires_encryption_key(monkeypatch) -> None:
     tmp_path = storage_root()
     monkeypatch.setenv("SMRITI_ENV", "production")

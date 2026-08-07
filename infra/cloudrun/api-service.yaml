@@ -1,0 +1,50 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: smriti-api
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      serviceAccountName: SMRITI_RUNTIME_SERVICE_ACCOUNT
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT/smriti/api:TAG
+          ports:
+            - containerPort: 8000
+          env:
+            - name: SMRITI_ENV
+              value: production
+            - name: DB_AUTO_CREATE
+              value: "false"
+            - name: AUTH_ENABLED
+              value: "true"
+            - name: AUTH_MODE
+              value: oidc
+            - name: RATE_LIMIT_BACKEND
+              value: redis
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: smriti-database-url
+                  key: latest
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: smriti-redis-url
+                  key: latest
+            - name: OIDC_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: smriti-oidc-issuer
+                  key: latest
+            - name: OIDC_AUDIENCE
+              valueFrom:
+                secretKeyRef:
+                  name: smriti-oidc-audience
+                  key: latest
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi

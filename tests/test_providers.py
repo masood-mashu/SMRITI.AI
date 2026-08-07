@@ -160,6 +160,24 @@ def test_vertex_text_generator_uses_injected_client() -> None:
     assert result.text == "Safe generated summary"
 
 
+def test_vertex_text_generator_streams_injected_client() -> None:
+    class FakeModels:
+        def generate_content_stream(self, **kwargs):
+            assert kwargs["model"] == "test-model"
+
+            class Chunk:
+                def __init__(self, text):
+                    self.text = text
+
+            return [Chunk("Safe "), Chunk("streamed summary")]
+
+    class FakeClient:
+        models = FakeModels()
+
+    result = list(VertexTextGenerator(model="test-model", client=FakeClient()).stream(prompt="test"))
+    assert result == ["Safe ", "streamed summary"]
+
+
 def test_vertex_text_generator_wraps_request_errors() -> None:
     class FakeModels:
         def generate_content(self, **kwargs):

@@ -4,12 +4,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
-COPY pyproject.toml README.md alembic.ini ./
+COPY pyproject.toml README.md requirements.lock alembic.ini ./
 COPY backend ./backend
 COPY frontend ./frontend
 COPY infra ./infra
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir -r requirements.lock && pip install --no-cache-dir --no-deps .
 
 EXPOSE 8000
 CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

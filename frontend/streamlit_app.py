@@ -1,5 +1,6 @@
 import os
 import time
+import json
 from uuid import uuid4
 
 import requests
@@ -37,6 +38,32 @@ def request_json(method: str, path: str, **kwargs) -> dict:
     if not response.ok:
         raise RuntimeError(f"Backend error ({response.status_code}): {response.text}")
     return response.json()
+
+
+def stream_text(path: str, **kwargs):
+    headers = dict(kwargs.pop("headers", {}))
+    if API_TOKEN:
+        headers["Authorization"] = f"Bearer {API_TOKEN}"
+    try:
+        response = requests.post(
+            f"{API_URL}{path}",
+            headers=headers,
+            timeout=API_TIMEOUT,
+            stream=True,
+            **kwargs,
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Backend unavailable: {exc}") from exc
+    if not response.ok:
+        raise RuntimeError(f"Backend error ({response.status_code}): {response.text}")
+    for line in response.iter_lines(decode_unicode=True):
+        if not line or not line.startswith("data: "):
+            continue
+        event = json.loads(line[6:])
+        if event["type"] == "error":
+            raise RuntimeError(event["detail"])
+        if event["type"] == "chunk":
+            yield event["text"]
 
 
 if "patient_id" not in st.session_state:
@@ -114,26 +141,19 @@ col_brief, col_emergency, col_language = st.columns(3)
 with col_brief:
     if st.button("Doctor brief"):
         try:
-            result = request_json("POST", "/brief", params=api_params())
-            st.text(result["graph"]["doctor_brief"])
+            st.write_stream(stream_text("/brief/stream", params=api_params()))
         except RuntimeError as exc:
             st.error(str(exc))
 with col_emergency:
     if st.button("Emergency card"):
         try:
-            result = request_json("POST", "/emergency", params=api_params())
-            st.text(result["graph"]["emergency_card"])
+            st.write_stream(stream_text("/emergency/stream", params=api_params()))
         except RuntimeError as exc:
             st.error(str(exc))
 with col_language:
     language = st.selectbox("Language", ["en", "hi", "kn"], key="output_language")
     if st.button("Translate"):
         try:
-            result = request_json(
-                "POST",
-                "/translate",
-                params={**api_params(), "language": language},
-            )
-            st.text(result["graph"]["translation"])
+            st.write_stream(stream_text("/translate/stream", params={**api_params(), "language": language}))
         except RuntimeError as exc:
             st.error(str(exc))

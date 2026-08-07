@@ -38,3 +38,10 @@ def test_patient_flow_upload_memory_mcp_and_outputs(monkeypatch) -> None:
         translation = client.post(f"/translate?patient_id={patient_id}&language=hi")
         assert brief.status_code == emergency.status_code == translation.status_code == 200
         assert brief.json()["graph"]["doctor_brief_provider"] == "deterministic"
+
+        brief_stream = client.post(f"/brief/stream?patient_id={patient_id}")
+        emergency_stream = client.post(f"/emergency/stream?patient_id={patient_id}")
+        translation_stream = client.post(f"/translate/stream?patient_id={patient_id}&language=hi")
+        assert brief_stream.status_code == emergency_stream.status_code == translation_stream.status_code == 200
+        assert '"type": "chunk"' in brief_stream.text
+        assert '"type": "done"' in emergency_stream.text

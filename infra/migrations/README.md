@@ -1,6 +1,6 @@
 # Database migrations
 
-Production uses Alembic. Apply the baseline PostgreSQL migration with:
+Production uses Alembic. Apply the PostgreSQL migration chain with:
 
 ```bash
 alembic upgrade head
@@ -11,4 +11,4 @@ the `superseded_by` self-reference and partial current-facts index. Set
 `DB_AUTO_CREATE=false` for deployed environments.
 
 SQLite remains available for local development with automatic table creation;
-it is not a production database target.
+it is not a production database target and should not be used with Alembic.

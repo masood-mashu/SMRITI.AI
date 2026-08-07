@@ -1,5 +1,6 @@
 """LangGraph skeleton for Smriti's five-agent pipeline."""
 
+from collections.abc import Iterator
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -54,7 +55,7 @@ def report_understanding_agent(state: SmritiState) -> dict[str, Any]:
             filename=state.get("filename", "file"),
             content_type=state.get("content_type", "application/octet-stream"),
         )
-    except PrivacyPolicyError as exc:
+    except (PrivacyPolicyError, RuntimeError) as exc:
         raise ProviderConfigurationError(str(exc)) from exc
     extraction = get_extractor(use_fixture=state.get("use_fixture", False)).extract(
         filename=state.get("filename", "file"),
@@ -157,6 +158,51 @@ def language_agent(state: SmritiState) -> dict[str, str]:
         ))
         return {"translation": result.text, "translation_provider": result.provider}
     return {"translation": f"Language Agent stub ({language}) using {len(facts)} current fact(s).", "translation_provider": "deterministic"}
+
+
+def stream_doctor_brief(state: SmritiState) -> Iterator[str]:
+    from uuid import UUID
+
+    with session_scope() as session:
+        facts = get_current_facts(session, UUID(state["patient_id"]))
+        contradictions = get_patient_contradictions(session, UUID(state["patient_id"]))
+    fact_lines = [f"- {fact.fact_key}: {fact.fact_value}" for fact in facts]
+    context = "Current health memory:\n" + ("\n".join(fact_lines) or "- No facts persisted yet.")
+    if contradictions:
+        context += "\nContradictions to review:\n- " + "\n- ".join(item.description for item in contradictions)
+    generator = get_vertex_generator(model_env="DOCTOR_BRIEF_MODEL", default_model="gemini-3.5-flash")
+    if generator is None:
+        yield context
+        return
+    prompt = get_prompt_registry().get("doctor_brief").format(context=context)
+    yield from generator.stream(prompt=prompt)
+
+
+def stream_emergency(state: SmritiState) -> Iterator[str]:
+    from uuid import UUID
+
+    with session_scope() as session:
+        facts = get_emergency_facts(session, UUID(state["patient_id"]))
+    card = "Emergency-relevant facts:\n" + ("\n".join(f"- {fact.fact_key}: {fact.fact_value}" for fact in facts) or "- None recorded yet.")
+    generator = get_vertex_generator(model_env="EMERGENCY_MODEL", default_model="gemini-3.5-flash-lite")
+    if generator is None:
+        yield card
+        return
+    yield from generator.stream(prompt=get_prompt_registry().get("emergency_card").format(context=card))
+
+
+def stream_language(state: SmritiState) -> Iterator[str]:
+    from uuid import UUID
+
+    with session_scope() as session:
+        facts = get_current_facts(session, UUID(state["patient_id"]))
+    language = state.get("target_language", "en")
+    summary = "\n".join(f"- {fact.fact_key}: {fact.fact_value}" for fact in facts) or "No facts recorded yet."
+    generator = get_vertex_generator(model_env="LANGUAGE_MODEL", default_model="gemini-3.5-flash")
+    if generator is None:
+        yield f"Language Agent stub ({language}) using {len(facts)} current fact(s)."
+        return
+    yield from generator.stream(prompt=get_prompt_registry().get("language").format(language=language, context=summary))
 
 
 def build_ingestion_graph():

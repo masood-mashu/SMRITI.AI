@@ -55,10 +55,24 @@ def persist_report_and_facts(
                 HealthFact.patient_id == patient_id,
                 HealthFact.fact_key == fact_key,
                 HealthFact.superseded_by.is_(None),
-            )
+            ).with_for_update()
         ).first()
 
-        if current is not None and current.fact_value == str(payload["fact_value"]):
+        payload_value = str(payload["fact_value"])
+        payload_unit = payload.get("unit")
+        payload_status = str(payload.get("status", "active"))
+        payload_emergency = bool(payload.get("is_emergency_relevant", False))
+        payload_date = payload.get("effective_date", date.today())
+        payload_confidence = payload.get("confidence")
+
+        if current is not None and (
+            current.fact_value == payload_value
+            and current.unit == payload_unit
+            and current.status == payload_status
+            and current.is_emergency_relevant == payload_emergency
+            and current.effective_date == payload_date
+            and current.confidence == payload_confidence
+        ):
             continue
 
         fact = HealthFact(
@@ -67,12 +81,12 @@ def persist_report_and_facts(
             report_id=report.report_id,
             fact_type=str(payload["fact_type"]),
             fact_key=fact_key,
-            fact_value=str(payload["fact_value"]),
-            unit=payload.get("unit"),
-            status=str(payload.get("status", "active")),
-            is_emergency_relevant=bool(payload.get("is_emergency_relevant", False)),
-            effective_date=payload.get("effective_date", date.today()),
-            confidence=payload.get("confidence"),
+            fact_value=payload_value,
+            unit=payload_unit,
+            status=payload_status,
+            is_emergency_relevant=payload_emergency,
+            effective_date=payload_date,
+            confidence=payload_confidence,
         )
         if current is not None:
             # Close the current row before inserting its replacement so the

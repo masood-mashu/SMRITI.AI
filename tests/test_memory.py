@@ -60,6 +60,30 @@ def test_same_current_value_is_not_duplicated() -> None:
         assert len(session.exec(select(HealthFact)).all()) == 1
 
 
+def test_same_value_with_changed_status_is_historied() -> None:
+    patient_id = uuid4()
+    with make_session() as session:
+        persist_report_and_facts(
+            session,
+            patient_id=patient_id,
+            source_type="prescription",
+            raw_extraction=None,
+            extracted_facts=[fact("500 mg")],
+        )
+        _, new_facts, contradictions = persist_report_and_facts(
+            session,
+            patient_id=patient_id,
+            source_type="prescription",
+            raw_extraction=None,
+            extracted_facts=[{**fact("500 mg"), "status": "discontinued"}],
+        )
+        session.commit()
+        assert len(new_facts) == 1
+        assert new_facts[0].status == "discontinued"
+        assert len(contradictions) == 1
+        assert len(session.exec(select(HealthFact)).all()) == 2
+
+
 def test_changed_value_supersedes_old_and_records_contradiction() -> None:
     patient_id = uuid4()
     with make_session() as session:

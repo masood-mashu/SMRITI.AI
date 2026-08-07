@@ -3,6 +3,7 @@ import os
 import sys
 
 from alembic import context
+from alembic.util import CommandError
 from sqlalchemy import engine_from_config, pool
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -22,12 +23,16 @@ def database_url() -> str:
 
 
 def run_migrations_offline() -> None:
+    if database_url().startswith("sqlite"):
+        raise CommandError("Alembic migrations target PostgreSQL; use DB_AUTO_CREATE=true for local SQLite")
     context.configure(url=database_url(), target_metadata=target_metadata, literal_binds=True)
     with context.begin_transaction():
         context.run_migrations()
 
 
 def run_migrations_online() -> None:
+    if database_url().startswith("sqlite"):
+        raise CommandError("Alembic migrations target PostgreSQL; use DB_AUTO_CREATE=true for local SQLite")
     configuration = config.get_section(config.config_ini_section, {})
     configuration["sqlalchemy.url"] = database_url()
     connectable = engine_from_config(configuration, prefix="sqlalchemy.", poolclass=pool.NullPool)

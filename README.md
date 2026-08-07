@@ -8,6 +8,10 @@ The current implementation is a production-oriented prototype: the local
 fixture path is fully runnable, while Vertex/Gemma, OIDC, BigQuery, AI Studio,
 and OTLP services are opt-in integrations.
 
+The canonical product and architecture references are [prd-2.md](prd-2.md),
+[architecture/arc 2.json](<architecture/arc 2.json>), and
+[architecture/arc-2.png](architecture/arc-2.png).
+
 ## Architecture
 
 - FastAPI backend in `backend/app/`
@@ -86,6 +90,7 @@ STORAGE_PROVIDER=local
 STORAGE_ENCRYPTION_REQUIRED=true
 STORAGE_ENCRYPTION_KEY=<base64-fernet-key>
 STORAGE_RETENTION_DAYS=30
+UPLOAD_SIGNATURE_CHECK=true
 ```
 
 For local/demo authentication, use `AUTH_MODE=token` and
@@ -93,7 +98,9 @@ For local/demo authentication, use `AUTH_MODE=token` and
 
 If local file storage is used in production, provide a Fernet key through a
 secret manager and set a retention window. GCS storage should use the bucket's
-server-side encryption and lifecycle policies.
+server-side encryption and lifecycle policies. Configure
+GCS_KMS_KEY_NAME and GCS_KMS_KEY_REQUIRED=true when customer-managed
+encryption is required.
 
 ## Optional integrations
 
@@ -119,6 +126,9 @@ Production schema changes use Alembic:
 $env:DATABASE_URL="postgresql+psycopg://..."
 .\.venv\Scripts\alembic.exe upgrade head
 ```
+
+Alembic migrations target PostgreSQL. Local SQLite development uses
+`DB_AUTO_CREATE=true` and does not run the PostgreSQL migration chain.
 
 `infra/schema.sql` remains the canonical reference DDL. The migration preserves
 the required tables: `patients`, `reports`, `health_facts`, and
@@ -148,7 +158,9 @@ Smriti is an organizational and explanatory aid, not a diagnostic or treatment
 system. Outputs must preserve recorded facts and surface uncertainty or
 contradictions for human review.
 
-Streaming responses, Vertex Vector Search, Cloud Run deployment manifests,
-live AI Studio credentials, and live cloud-provider smoke tests remain roadmap
-items. The current API intentionally uses request/response calls and on-demand
-output generation.
+Vertex Vector Search, Cloud Run deployment manifests, live AI Studio
+credentials, and live cloud-provider smoke tests remain roadmap items. The
+API supports request/response and optional HTTP SSE streaming for on-demand
+output generation. Real extraction and generation require
+`EXTRACTION_PROVIDER=vertex` and `OUTPUT_PROVIDER=vertex`; otherwise local
+uploads fail explicitly unless fixture mode is enabled in development.

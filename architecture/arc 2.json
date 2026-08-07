@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "diagramId": "6527d698-510c-48c5-b35e-1b8797b94e4e",
+  "diagramId": "54488316-8118-4c0e-9034-abe18a8c4d33",
   "title": "Architecture Diagram",
   "nodes": [
     {
@@ -16,7 +16,7 @@
         },
         {
           "id": "in-stream-understanding",
-          "label": "Explanation Stream",
+          "label": "Explanation Response",
           "side": "top"
         },
         {
@@ -81,34 +81,49 @@
           "side": "right"
         },
         {
-          "id": "left-2",
-          "label": "Left 2",
-          "side": "left"
-        },
-        {
-          "id": "left-3",
-          "label": "Left 3",
-          "side": "left"
-        },
-        {
-          "id": "left-4",
-          "label": "Left 4",
-          "side": "left"
-        },
-        {
           "id": "right-2",
-          "label": "Right 2",
+          "label": "PII Scrubbing",
           "side": "right"
         },
         {
           "id": "right-3",
-          "label": "Right 3",
+          "label": "Telemetry",
           "side": "right"
         },
         {
           "id": "right-4",
+          "label": "Registry Access",
+          "side": "right"
+        },
+        {
+          "id": "left-2",
+          "label": "Return Card",
+          "side": "left"
+        },
+        {
+          "id": "left-3",
+          "label": "Return Translation",
+          "side": "left"
+        },
+        {
+          "id": "left-4",
+          "label": "HTTPS (OAuth2)",
+          "side": "left"
+        },
+        {
+          "id": "right-5",
+          "label": "Right 5",
+          "side": "right"
+        },
+        {
+          "id": "right-6",
+          "label": "Right 6",
+          "side": "right"
+        },
+        {
+          "id": "right-7",
           "side": "right",
-          "label": "Right 4"
+          "label": "Right 7"
         }
       ],
       "data": {
@@ -118,7 +133,8 @@
           "OAuth2/OIDC",
           "Rate Limiting",
           "LangGraph"
-        ]
+        ],
+        "isolated": false
       }
     },
     {
@@ -144,18 +160,18 @@
         },
         {
           "id": "right-2",
-          "label": "Right 2",
+          "label": "Memory Sync",
           "side": "right"
         },
         {
           "id": "left-2",
-          "label": "Left 2",
+          "label": "Clean Data",
           "side": "left"
         },
         {
           "id": "left-3",
-          "side": "left",
-          "label": "Left 3"
+          "label": "Fetch Prompts",
+          "side": "left"
         }
       ],
       "data": {
@@ -164,8 +180,9 @@
           "Gemini 3.1 Pro",
           "Google ADK",
           "MCP",
-          "A2A"
-        ]
+          "A2A (Contract Boundary)"
+        ],
+        "isolated": false
       }
     },
     {
@@ -186,38 +203,28 @@
         },
         {
           "id": "out-fanout",
-          "label": "Fan-out Agents",
+          "label": "On-demand Context",
           "side": "right"
         },
         {
           "id": "right-2",
-          "label": "Right 2",
-          "side": "right"
-        },
-        {
-          "id": "right-3",
-          "label": "Right 3",
-          "side": "right"
-        },
-        {
-          "id": "right-4",
-          "label": "Right 4",
-          "side": "right"
-        },
-        {
-          "id": "right-5",
-          "label": "Right 5",
+          "label": "DB Sync",
           "side": "right"
         },
         {
           "id": "right-6",
-          "label": "Right 6",
+          "label": "Secure State",
           "side": "right"
         },
         {
           "id": "right-7",
-          "side": "right",
-          "label": "Right 7"
+          "label": "Analytics Sync",
+          "side": "right"
+        },
+        {
+          "id": "right-8",
+          "label": "Contradiction Review",
+          "side": "right"
         }
       ],
       "data": {
@@ -226,7 +233,40 @@
           "Python",
           "LangGraph",
           "SQLModel"
-        ]
+        ],
+        "isolated": false
+      }
+    },
+    {
+      "id": "contradiction-review",
+      "type": "workflow",
+      "label": "Contradiction Review (HITL)",
+      "generic_name": "Human Review Boundary",
+      "ports": [
+        {
+          "id": "in-alert",
+          "label": "Unresolved Contradiction",
+          "side": "left"
+        },
+        {
+          "id": "out-decision",
+          "label": "Review Decision",
+          "side": "right"
+        },
+        {
+          "id": "out-audit",
+          "label": "Audit Event",
+          "side": "bottom"
+        }
+      ],
+      "data": {
+        "description": "Authorized patient, caregiver, or clinician reviews conflicting source facts; historical facts are never silently overwritten.",
+        "tech": [
+          "FastAPI",
+          "SQLModel",
+          "RBAC/Consent Boundary"
+        ],
+        "isolated": false
       }
     },
     {
@@ -237,7 +277,7 @@
       "ports": [
         {
           "id": "in-fanout",
-          "label": "Fan-in",
+          "label": "On-demand Request",
           "side": "left"
         },
         {
@@ -256,19 +296,24 @@
           "side": "right"
         },
         {
-          "id": "right-2",
-          "label": "Right 2",
-          "side": "right"
-        },
-        {
           "id": "right-3",
-          "label": "Right 3",
+          "label": "Vector Search",
           "side": "right"
         },
         {
           "id": "right-4",
-          "side": "right",
-          "label": "Right 4"
+          "label": "Context Request",
+          "side": "right"
+        },
+        {
+          "id": "in",
+          "label": "in",
+          "side": "left"
+        },
+        {
+          "id": "right-5",
+          "label": "Output Contract",
+          "side": "right"
         }
       ],
       "data": {
@@ -277,8 +322,9 @@
           "Gemini 3.5 Flash",
           "Google ADK",
           "MCP",
-          "A2A"
-        ]
+          "A2A (Contract Boundary)"
+        ],
+        "isolated": false
       }
     },
     {
@@ -289,7 +335,7 @@
       "ports": [
         {
           "id": "in-fanout",
-          "label": "Fan-in",
+          "label": "On-demand Request",
           "side": "left"
         },
         {
@@ -309,8 +355,13 @@
         },
         {
           "id": "right-2",
-          "label": "Right 2",
+          "label": "DB Lookup",
           "side": "right"
+        },
+        {
+          "id": "in",
+          "label": "in",
+          "side": "left"
         },
         {
           "id": "right-3",
@@ -324,8 +375,9 @@
           "Gemini 3.5 Flash-Lite",
           "Google ADK",
           "MCP",
-          "A2A"
-        ]
+          "A2A (Contract Boundary)"
+        ],
+        "isolated": false
       }
     },
     {
@@ -336,7 +388,7 @@
       "ports": [
         {
           "id": "in-fanout",
-          "label": "Fan-in",
+          "label": "On-demand Request",
           "side": "left"
         },
         {
@@ -350,6 +402,11 @@
           "side": "right"
         },
         {
+          "id": "in",
+          "label": "in",
+          "side": "left"
+        },
+        {
           "id": "right-2",
           "label": "Right 2",
           "side": "right"
@@ -361,8 +418,9 @@
           "Gemini 3.5 Flash",
           "Google ADK",
           "MCP",
-          "A2A"
-        ]
+          "A2A (Contract Boundary)"
+        ],
+        "isolated": false
       }
     },
     {
@@ -387,32 +445,38 @@
           "side": "left"
         },
         {
-          "id": "out",
-          "label": "Output",
-          "side": "right"
-        },
-        {
           "id": "left-2",
-          "label": "Left 2",
+          "label": "Merge/Insert In",
           "side": "left"
         },
         {
           "id": "left-3",
-          "side": "left",
-          "label": "Left 3"
+          "label": "SQL Query",
+          "side": "left"
+        },
+        {
+          "id": "in-review",
+          "label": "Review Decision",
+          "side": "left"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
         }
       ],
       "data": {
         "tech": [
           "Postgres (Cloud SQL)",
           "SQLModel"
-        ]
+        ],
+        "isolated": false
       }
     },
     {
       "id": "report-vector-store-db",
       "type": "database",
-      "label": "Vertex AI Vector Search",
+      "label": "Vertex AI Vector Search (Integration Boundary)",
       "generic_name": "Vector Database",
       "ports": [
         {
@@ -426,26 +490,27 @@
           "side": "left"
         },
         {
-          "id": "out",
-          "label": "Output",
-          "side": "right"
-        },
-        {
           "id": "left-2",
-          "label": "Left 2",
+          "label": "History Lookup In",
           "side": "left"
         },
         {
           "id": "left-3",
-          "side": "left",
-          "label": "Left 3"
+          "label": "Vector Search In",
+          "side": "left"
+        },
+        {
+          "id": "out",
+          "label": "Output",
+          "side": "right"
         }
       ],
       "data": {
         "tech": [
           "Vertex AI Vector Search",
           "Google Cloud Storage"
-        ]
+        ],
+        "isolated": false
       }
     },
     {
@@ -472,7 +537,6 @@
           "Cloud Run",
           "Python"
         ],
-        "cloud": "gcp",
         "isolated": false
       }
     },
@@ -499,14 +563,13 @@
           "BigQuery",
           "Google Cloud"
         ],
-        "cloud": "gcp",
         "isolated": false
       }
     },
     {
       "id": "antigravity-secure-enclave",
       "type": "service",
-      "label": "Antigravity Secure Enclave",
+      "label": "Antigravity Secure Enclave (Integration Boundary)",
       "generic_name": "Privacy Enclave",
       "ports": [
         {
@@ -526,7 +589,6 @@
           "Antigravity",
           "Confidential Computing"
         ],
-        "cloud": "gcp",
         "isolated": true
       }
     },
@@ -547,14 +609,9 @@
           "side": "right"
         },
         {
-          "id": "out-vector",
-          "label": "Vector Search",
-          "side": "bottom"
-        },
-        {
           "id": "right-2",
-          "side": "right",
-          "label": "Right 2"
+          "label": "Vector Search Out",
+          "side": "right"
         }
       ],
       "data": {
@@ -563,7 +620,6 @@
           "MCP (Model Context Protocol)",
           "Python"
         ],
-        "cloud": "gcp",
         "isolated": false
       }
     },
@@ -580,12 +636,12 @@
         },
         {
           "id": "in",
-          "label": "in",
+          "label": "Registry In",
           "side": "left"
         },
         {
-          "id": "out",
-          "label": "Output",
+          "id": "out-response",
+          "label": "Registry Response",
           "side": "right"
         }
       ],
@@ -595,7 +651,38 @@
           "AI Studio",
           "Google Cloud"
         ],
-        "cloud": "gcp",
+        "isolated": false
+      }
+    },
+    {
+      "id": "cloud-run-deployment",
+      "type": "infrastructure",
+      "label": "Cloud Run Deployment Boundary",
+      "generic_name": "Container Runtime",
+      "ports": [
+        {
+          "id": "in-api",
+          "label": "API Service",
+          "side": "left"
+        },
+        {
+          "id": "in-agents",
+          "label": "Agent Services",
+          "side": "left"
+        },
+        {
+          "id": "out-runtime",
+          "label": "Managed Runtime",
+          "side": "right"
+        }
+      ],
+      "data": {
+        "description": "Deployable Cloud Run boundary for stateless API and agent services; live rollout remains credential and billing dependent.",
+        "tech": [
+          "Cloud Run",
+          "Docker",
+          "Secret Manager Boundary"
+        ],
         "isolated": false
       }
     },
@@ -612,7 +699,7 @@
         },
         {
           "id": "in",
-          "label": "Input",
+          "label": "Telemetry In",
           "side": "left"
         },
         {
@@ -628,14 +715,13 @@
           "Cloud Trace",
           "Cloud Logging"
         ],
-        "cloud": "gcp",
         "isolated": true
       }
     }
   ],
   "edges": [
     {
-      "id": "memory-to-vector-db",
+      "id": "memory-to-vector-db-edge",
       "source": {
         "nodeId": "memory-agent",
         "portId": "out-fanout"
@@ -644,11 +730,11 @@
         "nodeId": "report-vector-store-db",
         "portId": "in"
       },
-      "type": "database",
-      "label": "Vector Search"
+      "type": "integration-boundary",
+      "label": "Vector Search Adapter"
     },
     {
-      "id": "doctor-brief-to-backend",
+      "id": "doctor-brief-to-backend-edge",
       "source": {
         "nodeId": "doctor-brief-agent",
         "portId": "out"
@@ -661,7 +747,7 @@
       "label": "Return Brief"
     },
     {
-      "id": "emergency-to-backend",
+      "id": "emergency-to-backend-edge",
       "source": {
         "nodeId": "emergency-agent",
         "portId": "out"
@@ -674,7 +760,7 @@
       "label": "Return Card"
     },
     {
-      "id": "language-to-backend",
+      "id": "language-to-backend-edge",
       "source": {
         "nodeId": "language-agent",
         "portId": "out"
@@ -687,7 +773,7 @@
       "label": "Return Translation"
     },
     {
-      "id": "emergency-to-db",
+      "id": "emergency-to-db-edge",
       "source": {
         "nodeId": "emergency-agent",
         "portId": "right-2"
@@ -700,7 +786,7 @@
       "label": "Structured Lookup"
     },
     {
-      "id": "understanding-to-streamlit",
+      "id": "understanding-to-streamlit-edge",
       "source": {
         "nodeId": "report-understanding-agent",
         "portId": "out-data"
@@ -709,24 +795,24 @@
         "nodeId": "streamlit-ui",
         "portId": "in"
       },
-      "type": "websocket",
-      "label": "Stream Explanation"
+      "type": "http",
+      "label": "Explanation Response"
     },
     {
-      "id": "doctor-to-streamlit",
+      "id": "doctor-to-streamlit-edge",
       "source": {
         "nodeId": "doctor-brief-agent",
-        "portId": "right-2"
+        "portId": "right-3"
       },
       "target": {
         "nodeId": "streamlit-ui",
         "portId": "left-2"
       },
-      "type": "websocket",
-      "label": "Stream Brief"
+      "type": "sse",
+      "label": "SSE Brief"
     },
     {
-      "id": "emergency-to-streamlit",
+      "id": "emergency-to-streamlit-edge",
       "source": {
         "nodeId": "emergency-agent",
         "portId": "right-3"
@@ -735,11 +821,11 @@
         "nodeId": "streamlit-ui",
         "portId": "left-3"
       },
-      "type": "websocket",
-      "label": "Stream Card"
+      "type": "sse",
+      "label": "SSE Card"
     },
     {
-      "id": "language-to-streamlit",
+      "id": "language-to-streamlit-edge",
       "source": {
         "nodeId": "language-agent",
         "portId": "right-2"
@@ -748,11 +834,11 @@
         "nodeId": "streamlit-ui",
         "portId": "left-4"
       },
-      "type": "websocket",
-      "label": "Stream Translation"
+      "type": "sse",
+      "label": "SSE Translation"
     },
     {
-      "id": "fastapi-to-understanding",
+      "id": "fastapi-to-understanding-edge",
       "source": {
         "nodeId": "fastapi-backend",
         "portId": "out-trigger-understanding"
@@ -765,7 +851,7 @@
       "label": "Trigger Extraction"
     },
     {
-      "id": "understanding-to-memory",
+      "id": "understanding-to-memory-edge",
       "source": {
         "nodeId": "report-understanding-agent",
         "portId": "right-2"
@@ -778,7 +864,7 @@
       "label": "Extracted Data"
     },
     {
-      "id": "memory-to-db",
+      "id": "memory-to-db-edge",
       "source": {
         "nodeId": "memory-agent",
         "portId": "right-2"
@@ -791,59 +877,46 @@
       "label": "Merge/Insert"
     },
     {
-      "id": "memory-to-doctor",
+      "id": "memory-to-contradiction-review-edge",
       "source": {
         "nodeId": "memory-agent",
-        "portId": "right-3"
+        "portId": "right-8"
       },
       "target": {
-        "nodeId": "doctor-brief-agent",
-        "portId": "in-fanout"
+        "nodeId": "contradiction-review",
+        "portId": "in-alert"
       },
-      "type": "internal-api",
-      "label": "Fan-out Brief"
+      "type": "human-review",
+      "label": "Review Required"
     },
     {
-      "id": "memory-to-emergency",
+      "id": "contradiction-review-to-db-edge",
       "source": {
-        "nodeId": "memory-agent",
+        "nodeId": "contradiction-review",
+        "portId": "out-decision"
+      },
+      "target": {
+        "nodeId": "health-profile-db",
+        "portId": "in-review"
+      },
+      "type": "database",
+      "label": "Record Review Decision"
+    },
+    {
+      "id": "doctor-to-vector-edge",
+      "source": {
+        "nodeId": "doctor-brief-agent",
         "portId": "right-4"
-      },
-      "target": {
-        "nodeId": "emergency-agent",
-        "portId": "in-fanout"
-      },
-      "type": "internal-api",
-      "label": "Fan-out Emergency"
-    },
-    {
-      "id": "memory-to-language",
-      "source": {
-        "nodeId": "memory-agent",
-        "portId": "right-5"
-      },
-      "target": {
-        "nodeId": "language-agent",
-        "portId": "in-fanout"
-      },
-      "type": "internal-api",
-      "label": "Fan-out Language"
-    },
-    {
-      "id": "doctor-to-vector",
-      "source": {
-        "nodeId": "doctor-brief-agent",
-        "portId": "right-3"
       },
       "target": {
         "nodeId": "report-vector-store-db",
         "portId": "left-2"
       },
-      "type": "database",
-      "label": "History Lookup"
+      "type": "integration-boundary",
+      "label": "Vector History Adapter"
     },
     {
-      "id": "ui-to-gateway-secure",
+      "id": "ui-to-gateway-secure-edge",
       "source": {
         "nodeId": "streamlit-ui",
         "portId": "out-upload"
@@ -856,7 +929,7 @@
       "label": "HTTPS (OAuth2)"
     },
     {
-      "id": "gateway-to-gemma",
+      "id": "gateway-to-gemma-edge",
       "source": {
         "nodeId": "fastapi-backend",
         "portId": "right-2"
@@ -869,7 +942,7 @@
       "label": "PII Scrubbing"
     },
     {
-      "id": "gemma-to-understanding",
+      "id": "gemma-to-understanding-edge",
       "source": {
         "nodeId": "gemma-pii-scrubber",
         "portId": "out"
@@ -882,7 +955,7 @@
       "label": "Clean Data"
     },
     {
-      "id": "memory-to-antigravity",
+      "id": "memory-to-antigravity-edge",
       "source": {
         "nodeId": "memory-agent",
         "portId": "right-6"
@@ -891,11 +964,11 @@
         "nodeId": "antigravity-secure-enclave",
         "portId": "in"
       },
-      "type": "internal-api",
-      "label": "Secure State"
+      "type": "integration-boundary",
+      "label": "Antigravity Secure State Adapter"
     },
     {
-      "id": "memory-to-bigquery",
+      "id": "memory-to-bigquery-edge",
       "source": {
         "nodeId": "memory-agent",
         "portId": "right-7"
@@ -908,7 +981,7 @@
       "label": "Analytics Sync"
     },
     {
-      "id": "agents-to-mcp",
+      "id": "agents-to-mcp-edge",
       "source": {
         "nodeId": "doctor-brief-agent",
         "portId": "right-4"
@@ -921,7 +994,7 @@
       "label": "Context Request"
     },
     {
-      "id": "mcp-to-postgres",
+      "id": "mcp-to-postgres-edge",
       "source": {
         "nodeId": "mcp-context-gateway",
         "portId": "out-db"
@@ -934,7 +1007,7 @@
       "label": "SQL Query"
     },
     {
-      "id": "mcp-to-vector",
+      "id": "mcp-to-vector-edge",
       "source": {
         "nodeId": "mcp-context-gateway",
         "portId": "right-2"
@@ -943,11 +1016,11 @@
         "nodeId": "report-vector-store-db",
         "portId": "left-3"
       },
-      "type": "database",
-      "label": "Vector Search"
+      "type": "integration-boundary",
+      "label": "Vector Search Adapter"
     },
     {
-      "id": "agents-to-ai-studio",
+      "id": "agents-to-ai-studio-edge",
       "source": {
         "nodeId": "ai-studio-registry",
         "portId": "out"
@@ -960,7 +1033,33 @@
       "label": "Fetch Prompts"
     },
     {
-      "id": "all-to-otel",
+      "id": "cloud-run-api-boundary-edge",
+      "source": {
+        "nodeId": "fastapi-backend",
+        "portId": "right-5"
+      },
+      "target": {
+        "nodeId": "cloud-run-deployment",
+        "portId": "in-api"
+      },
+      "type": "deployment-boundary",
+      "label": "Cloud Run API Service"
+    },
+    {
+      "id": "cloud-run-agent-boundary-edge",
+      "source": {
+        "nodeId": "report-understanding-agent",
+        "portId": "right-2"
+      },
+      "target": {
+        "nodeId": "cloud-run-deployment",
+        "portId": "in-agents"
+      },
+      "type": "deployment-boundary",
+      "label": "Cloud Run Agent Services"
+    },
+    {
+      "id": "all-to-otel-edge",
       "source": {
         "nodeId": "fastapi-backend",
         "portId": "right-3"
@@ -973,7 +1072,7 @@
       "label": "Telemetry"
     },
     {
-      "id": "7d5ddb35-e859-42cc-ab18-541407aea916",
+      "id": "fastapi-to-ai-studio-edge",
       "source": {
         "nodeId": "fastapi-backend",
         "portId": "right-4"
@@ -981,6 +1080,45 @@
       "target": {
         "nodeId": "ai-studio-registry",
         "portId": "in"
+      },
+      "type": "internal-api",
+      "label": "Registry Access"
+    },
+    {
+      "id": "141c79c9-7e85-4d43-b291-7efe94b78f9f",
+      "source": {
+        "nodeId": "fastapi-backend",
+        "portId": "right-5"
+      },
+      "target": {
+        "nodeId": "doctor-brief-agent",
+        "portId": "in-fanout"
+      },
+      "type": "internal-api",
+      "label": null
+    },
+    {
+      "id": "cc06c3fa-e09f-46bb-82dd-511980e712f8",
+      "source": {
+        "nodeId": "fastapi-backend",
+        "portId": "right-6"
+      },
+      "target": {
+        "nodeId": "emergency-agent",
+        "portId": "in-fanout"
+      },
+      "type": "internal-api",
+      "label": null
+    },
+    {
+      "id": "02df5298-716f-4fad-8927-9e76dd40a3cc",
+      "source": {
+        "nodeId": "fastapi-backend",
+        "portId": "right-7"
+      },
+      "target": {
+        "nodeId": "language-agent",
+        "portId": "in-fanout"
       },
       "type": "internal-api",
       "label": null
@@ -1007,6 +1145,7 @@
       "children": [
         "report-understanding-agent",
         "memory-agent",
+        "contradiction-review",
         "doctor-brief-agent",
         "emergency-agent",
         "language-agent",
@@ -1014,7 +1153,7 @@
         "mcp-context-gateway"
       ],
       "id": "agent-mesh-group",
-      "label": "Agentic Mesh (ADK/MCP/A2A)"
+      "label": "Agentic Mesh (ADK/MCP; A2A Contract Boundary)"
     },
     {
       "children": [
@@ -1031,7 +1170,27 @@
       ],
       "id": "observability-group",
       "label": "Observability & Tracing"
+    },
+    {
+      "children": [
+        "cloud-run-deployment"
+      ],
+      "id": "deployment-group",
+      "label": "Deployment Boundaries"
     }
   ],
-  "metadata": {}
+  "metadata": {
+    "current_state": "production-oriented prototype with deployable integration boundaries",
+    "stream_transport": "HTTP Server-Sent Events (SSE)",
+    "privacy_policy": "PII scrubbing before cloud provider calls; encrypted storage and configurable retention",
+    "compliance_policy": "GDPR-style deletion, retention, consent, and audit controls required before real production PHI",
+    "integration_boundaries": [
+      "AI Studio prompt registry",
+      "Vertex Gemini and Vector Search",
+      "Antigravity secure state",
+      "A2A contract",
+      "Cloud Run deployment",
+      "BigQuery anonymized audit"
+    ]
+  }
 }

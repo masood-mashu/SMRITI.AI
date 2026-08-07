@@ -1,4 +1,9 @@
-# SMRITI.AI Security & Codebase Audit Report
+# SMRITI.AI Security & Codebase Audit Report (historical)
+
+> This report is retained as audit history. It is superseded by the repository
+> implementation and the current audit delivered on 2026-08-07. In particular,
+> the MCP authorization, CI hardening, current-fact uniqueness, and MIME
+> validation findings below have since been addressed.
 
 ## Executive Summary
 **SMRITI.AI** has a clean prototype structure (`FastAPI` backend, `Streamlit` UI, `SQLModel` schema, `LangGraph` orchestration, tests), but it has **one critical authorization flaw** and several high-impact security/operational gaps before production use.

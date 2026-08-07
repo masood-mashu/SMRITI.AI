@@ -4,10 +4,11 @@ from pathlib import Path
 from typing import Literal
 import os
 import time
+import json
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from .db import check_database, init_db, session_scope
 from .extractor import ExtractionError, ProviderConfigurationError
@@ -17,6 +18,9 @@ from .graph import (
     emergency_graph,
     language_graph,
     smriti_ingestion_graph,
+    stream_doctor_brief,
+    stream_emergency,
+    stream_language,
 )
 from .repositories import get_fact_timeline, get_patient_contradictions
 from .models import HealthFact
@@ -37,16 +41,31 @@ DEFAULT_PATIENT_ID = UUID("00000000-0000-0000-0000-000000000001")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = {"application/pdf", "image/png", "image/jpeg", "text/plain"}
 ALLOWED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".txt"}
+SUPPORTED_LANGUAGES = {"en", "hi", "kn"}
 
 
 @app.exception_handler(GenerationError)
 async def generation_error_handler(request: Request, exc: GenerationError) -> JSONResponse:
-    return JSONResponse(status_code=502, content={"detail": str(exc)})
+    response = JSONResponse(status_code=502, content={"detail": str(exc)})
+    request_id = getattr(request.state, "request_id", None)
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    response = JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
+    request_id = getattr(request.state, "request_id", None)
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
+    return response
 
 
 @app.middleware("http")
 async def request_observability(request: Request, call_next):
     request_id = str(uuid4())
+    request.state.request_id = request_id
     started = time.perf_counter()
     response = None
     status_code = 500
@@ -99,6 +118,21 @@ def validate_upload(*, filename: str, content_type: str, content: bytes) -> None
         raise HTTPException(status_code=415, detail="Unsupported report type")
     if expected_types[suffix] != content_type:
         raise HTTPException(status_code=415, detail="Unsupported report type")
+    strict_signature = os.getenv(
+        "UPLOAD_SIGNATURE_CHECK",
+        "true" if os.getenv("SMRITI_ENV", "development").lower() == "production" else "false",
+    ).lower() in {"1", "true", "yes", "on"}
+    if not strict_signature:
+        return
+    signatures = {
+        ".pdf": content.startswith(b"%PDF-"),
+        ".png": content.startswith(b"\x89PNG\r\n\x1a\n"),
+        ".jpg": content.startswith(b"\xff\xd8\xff"),
+        ".jpeg": content.startswith(b"\xff\xd8\xff"),
+        ".txt": True,
+    }
+    if not signatures[suffix]:
+        raise HTTPException(status_code=415, detail="File signature does not match the declared type")
 
 
 def serialize_fact(fact: HealthFact) -> dict:
@@ -146,14 +180,19 @@ async def upload_report(
     source_type: Literal["lab_result", "discharge_summary", "prescription", "other"] = "other",
     fixture: bool = False,
 ) -> dict:
+    environment = os.getenv("SMRITI_ENV", "development").lower()
+    if fixture and environment not in {"development", "test"}:
+        raise HTTPException(status_code=400, detail="fixture mode is available only in development and test environments")
     content = await file.read()
     validate_upload(
         filename=file.filename or "upload",
         content_type=file.content_type or "application/octet-stream",
         content=content,
     )
+    resolved_patient_id = resolve_patient_id(patient_id, request)
     try:
-        file_url = get_storage().store(
+        storage = get_storage()
+        file_url = storage.store(
             filename=file.filename or "upload",
             content=content,
             content_type=file.content_type or "application/octet-stream",
@@ -162,7 +201,7 @@ async def upload_report(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     try:
         result = smriti_ingestion_graph.invoke({
-            "patient_id": resolve_patient_id(patient_id, request),
+            "patient_id": resolved_patient_id,
             "filename": file.filename or "upload",
             "content_type": file.content_type or "application/octet-stream",
             "source_type": source_type,
@@ -171,8 +210,16 @@ async def upload_report(
             "report_bytes": content,
         })
     except ProviderConfigurationError as exc:
+        try:
+            storage.delete(file_url)
+        except StorageError:
+            pass
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ExtractionError as exc:
+        try:
+            storage.delete(file_url)
+        except StorageError:
+            pass
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     result.pop("report_bytes", None)
     return {"status": "accepted", "filename": file.filename, "graph": result}
@@ -215,8 +262,56 @@ def generate_emergency_card(request: Request, patient_id: UUID | None = None) ->
 
 @app.post("/translate", dependencies=[Depends(require_security)])
 def translate_output(request: Request, patient_id: UUID | None = None, language: str = "en") -> dict:
+    if language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported language; choose one of: {', '.join(sorted(SUPPORTED_LANGUAGES))}",
+        )
     result = language_graph.invoke({
         "patient_id": resolve_patient_id(patient_id, request),
         "target_language": language,
     })
     return {"status": "generated", "language": language, "graph": result}
+
+
+def _sse_stream(chunks):
+    try:
+        for chunk in chunks:
+            yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
+        yield "data: {\"type\": \"done\"}\n\n"
+    except GenerationError as exc:
+        yield f"data: {json.dumps({'type': 'error', 'detail': str(exc)})}\n\n"
+
+
+@app.post("/brief/stream", dependencies=[Depends(require_security)])
+def stream_doctor_brief_output(request: Request, patient_id: UUID | None = None) -> StreamingResponse:
+    resolved_id = resolve_patient_id(patient_id, request)
+    return StreamingResponse(
+        _sse_stream(stream_doctor_brief({"patient_id": resolved_id})),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/emergency/stream", dependencies=[Depends(require_security)])
+def stream_emergency_output(request: Request, patient_id: UUID | None = None) -> StreamingResponse:
+    resolved_id = resolve_patient_id(patient_id, request)
+    return StreamingResponse(
+        _sse_stream(stream_emergency({"patient_id": resolved_id})),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/translate/stream", dependencies=[Depends(require_security)])
+def stream_translation_output(
+    request: Request, patient_id: UUID | None = None, language: str = "en"
+) -> StreamingResponse:
+    if language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(status_code=422, detail="Unsupported language; choose one of: en, hi, kn")
+    resolved_id = resolve_patient_id(patient_id, request)
+    return StreamingResponse(
+        _sse_stream(stream_language({"patient_id": resolved_id, "target_language": language})),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
