@@ -20,6 +20,9 @@ class FileStorage(Protocol):
     def delete(self, reference: str) -> None:
         """Delete a previously stored object when processing cannot complete."""
 
+    def read(self, reference: str) -> bytes:
+        """Read a previously stored object for asynchronous processing."""
+
 
 class LocalFileStorage:
     def __init__(
@@ -29,6 +32,7 @@ class LocalFileStorage:
         encryption_key: str | None = None,
         encryption_required: bool = False,
         retention_days: int = 0,
+        cleanup_on_init: bool = True,
     ) -> None:
         self.root = Path(root)
         self._fernet = None
@@ -40,7 +44,8 @@ class LocalFileStorage:
         if encryption_required and self._fernet is None:
             raise StorageError("STORAGE_ENCRYPTION_KEY is required for encrypted local storage")
         self.retention_days = max(0, retention_days)
-        self.cleanup_expired()
+        if cleanup_on_init:
+            self.cleanup_expired()
 
     def store(self, *, filename: str, content: bytes, content_type: str) -> str:
         suffix = Path(filename).suffix.lower()
@@ -61,6 +66,18 @@ class LocalFileStorage:
             raise StorageError("Invalid local storage reference")
         if path.exists():
             path.unlink()
+
+    def read(self, reference: str) -> bytes:
+        prefix = "local://"
+        if not reference.startswith(prefix):
+            raise StorageError("Invalid local storage reference")
+        key = reference[len(prefix):]
+        path = (self.root / key).resolve()
+        root = self.root.resolve()
+        if root not in path.parents or not path.is_file():
+            raise StorageError("Stored report is unavailable")
+        payload = path.read_bytes()
+        return self._fernet.decrypt(payload) if self._fernet else payload
 
     def cleanup_expired(self) -> int:
         """Remove local files older than the configured retention window."""
@@ -102,6 +119,16 @@ class GcsFileStorage:
             self.client.bucket(self.bucket_name).blob(key).delete()
         except Exception as exc:
             raise StorageError("Failed to delete GCS object") from exc
+
+    def read(self, reference: str) -> bytes:
+        prefix = f"gs://{self.bucket_name}/"
+        if not reference.startswith(prefix):
+            raise StorageError("Invalid GCS storage reference")
+        key = reference[len(prefix):]
+        try:
+            return self.client.bucket(self.bucket_name).blob(key).download_as_bytes()
+        except Exception as exc:
+            raise StorageError("Stored report is unavailable") from exc
 
 
 def get_storage() -> FileStorage:

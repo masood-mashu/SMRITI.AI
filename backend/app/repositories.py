@@ -27,10 +27,29 @@ def ensure_patient(session: Session, patient_id: UUID, display_name: str = "Smri
 
 
 def create_ingestion_job(
-    session: Session, *, patient_id: UUID, source_type: str, file_url: str | None
+    session: Session,
+    *,
+    patient_id: UUID,
+    source_type: str,
+    file_url: str | None,
+    filename: str = "report",
+    content_type: str = "application/octet-stream",
+    use_fixture: bool = False,
+    pii_redactions: int = 0,
+    pii_provider: str = "unknown",
 ) -> IngestionJob:
     ensure_patient(session, patient_id)
-    job = IngestionJob(patient_id=patient_id, source_type=source_type, file_url=file_url, status="running")
+    job = IngestionJob(
+        patient_id=patient_id,
+        source_type=source_type,
+        file_url=file_url,
+        filename=filename,
+        content_type=content_type,
+        use_fixture=use_fixture,
+        pii_redactions=pii_redactions,
+        pii_provider=pii_provider,
+        status="pending",
+    )
     session.add(job)
     session.flush()
     return job

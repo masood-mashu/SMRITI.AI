@@ -21,8 +21,23 @@ spec:
           env:
             - name: SMRITI_ENV
               value: production
-            - name: SMRITI_VALIDATE_PRODUCTION
-              value: "true"
+            - name: GCP_PROJECT
+              value: PROJECT
+            - name: METRICS_BACKEND
+              value: redis
+            - name: INGESTION_QUEUE_PROVIDER
+              value: cloud_tasks
+            - name: INGESTION_QUEUE_LOCATION
+              value: REGION
+            - name: INGESTION_QUEUE_NAME
+              value: smriti-ingestion
+            - name: INGESTION_WORKER_URL
+              value: https://API_HOST
+            - name: INGESTION_WORKER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: smriti-ingestion-worker-token
+                  key: latest
             - name: DB_AUTO_CREATE
               value: "false"
             - name: AUTH_ENABLED

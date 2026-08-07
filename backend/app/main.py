@@ -7,20 +7,18 @@ import time
 import json
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .db import check_database, init_db, session_scope
 from .config import validate_production_settings
-from .extractor import ExtractionError, ProviderConfigurationError
 from .generation import GenerationError
 from .graph import (
     doctor_brief_graph,
     emergency_graph,
     language_graph,
-    smriti_ingestion_graph,
     stream_doctor_brief,
     stream_emergency,
     stream_language,
@@ -40,10 +38,17 @@ from .observability import audit_log, prometheus_metrics, record_metric, trace_s
 from .security import enforce_patient_access, require_security
 from .mcp_server import router as mcp_router
 from .privacy import PrivacyPolicyError, get_pii_scrubber
+from .ingestion import QueueError, enqueue_ingestion_job, process_ingestion_job, queue_config, validate_worker_token
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    if os.getenv("SMRITI_VALIDATE_PRODUCTION", "false").lower() in {"1", "true", "yes", "on"}:
+    # Production must never rely on a second opt-in flag for its safety gate.
+    # Keep the flag as a backwards-compatible explicit validation trigger for
+    # staging and deployment smoke tests.
+    if (
+        os.getenv("SMRITI_ENV", "development").lower() == "production"
+        or os.getenv("SMRITI_VALIDATE_PRODUCTION", "false").lower() in {"1", "true", "yes", "on"}
+    ):
         validate_production_settings()
     init_db()
     yield
@@ -270,9 +275,18 @@ def ingestion_job_status(job_id: UUID, request: Request, patient_id: UUID | None
     }
 
 
+@app.post("/internal/ingestion-jobs/{job_id}/process")
+def process_ingestion_job_endpoint(job_id: UUID, request: Request) -> dict[str, str]:
+    if not validate_worker_token(request.headers.get("X-Smriti-Worker-Token")):
+        raise HTTPException(status_code=401, detail="Invalid ingestion worker credentials")
+    process_ingestion_job(job_id)
+    return {"status": "processed", "job_id": str(job_id)}
+
+
 @app.post("/reports", dependencies=[Depends(require_security)])
 async def upload_report(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     patient_id: UUID | None = None,
     source_type: Literal["lab_result", "discharge_summary", "prescription", "other"] = "other",
@@ -316,30 +330,18 @@ async def upload_report(
             patient_id=UUID(resolved_patient_id),
             source_type=source_type,
             file_url=file_url,
+            filename=file.filename or "upload",
+            content_type=file.content_type or "application/octet-stream",
+            use_fixture=fixture,
+            pii_redactions=scrubbed.redactions,
+            pii_provider=scrubbed.provider,
         )
     job_id = job.job_id
     try:
-        result = smriti_ingestion_graph.invoke({
-            "patient_id": resolved_patient_id,
-            "filename": file.filename or "upload",
-            "content_type": file.content_type or "application/octet-stream",
-            "source_type": source_type,
-            "use_fixture": fixture,
-            "file_url": file_url,
-            "report_bytes": content,
-            "report_is_scrubbed": True,
-            "pii_redactions": scrubbed.redactions,
-            "pii_provider": scrubbed.provider,
-        })
-    except ProviderConfigurationError as exc:
-        with session_scope() as session:
-            update_ingestion_job(session, job_id, status="failed", error=str(exc))
-        try:
-            storage.delete(file_url)
-        except StorageError:
-            pass
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except ExtractionError as exc:
+        enqueue_ingestion_job(job_id)
+        if queue_config().provider == "inline":
+            background_tasks.add_task(process_ingestion_job, job_id)
+    except QueueError as exc:
         with session_scope() as session:
             update_ingestion_job(session, job_id, status="failed", error=str(exc))
         try:
@@ -347,15 +349,13 @@ async def upload_report(
         except StorageError:
             pass
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    with session_scope() as session:
-        update_ingestion_job(
-            session,
-            job_id,
-            status="succeeded",
-            report_id=UUID(result["report_id"]),
-        )
-    result.pop("report_bytes", None)
-    return {"status": "accepted", "job_id": str(job_id), "job_status": "succeeded", "filename": file.filename, "graph": result}
+    return {
+        "status": "accepted",
+        "job_id": str(job_id),
+        "patient_id": resolved_patient_id,
+        "job_status": "pending",
+        "filename": file.filename or "upload",
+    }
 
 
 @app.get("/timeline", dependencies=[Depends(require_security)])

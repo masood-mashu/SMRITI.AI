@@ -107,6 +107,10 @@ OUTPUT_MAX_OUTPUT_TOKENS=2048
 
 For local/demo authentication, use `AUTH_MODE=token` and
 `SMRITI_API_TOKEN`. Never commit real credentials.
+Token mode is single-tenant outside development/test environments; set
+`SMRITI_TOKEN_PATIENT_ID` to the one permitted patient UUID. Production still
+requires OIDC and now validates that configuration automatically whenever
+`SMRITI_ENV=production`.
 
 If local file storage is used in production, provide a Fernet key through a
 secret manager and set a retention window. GCS storage should use the bucket's
@@ -129,6 +133,9 @@ encryption is required.
 Vertex calls require Google Cloud credentials, an enabled Vertex API, and an
 active billing configuration. Without those, use the fixture and deterministic
 providers. No real patient data is required for local verification.
+To validate all live provider paths with synthetic text, run
+`.\.venv\Scripts\python.exe scripts/live_provider_smoke.py` after configuring
+Application Default Credentials and `GOOGLE_CLOUD_PROJECT`.
 
 ## Database
 
@@ -150,6 +157,10 @@ Run the deterministic synthetic extraction baseline and the full test gate:
 .\.venv\Scripts\python.exe scripts/run_extraction_eval.py
 .\.venv\Scripts\python.exe -m pytest --cov=backend --cov-fail-under=75 -q
 ```
+
+For local encrypted-storage retention cleanup, run
+`.\.venv\Scripts\python.exe scripts/cleanup_storage.py` from a scheduled job.
+For GCS, configure a bucket lifecycle policy instead.
 
 For a running non-production service, use the opt-in load smoke tool:
 

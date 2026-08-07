@@ -19,7 +19,10 @@ def run_evaluation() -> tuple[int, int, int]:
     passed = 0
     total_expected = 0
     total_predicted = 0
+    adversarial_cases = 0
     for case in cases:
+        if case.get("adversarial"):
+            adversarial_cases += 1
         result = extractor.extract(
             filename="synthetic.txt",
             content_type="text/plain",
@@ -35,6 +38,10 @@ def run_evaluation() -> tuple[int, int, int]:
             passed += 1
         else:
             print(f"FAIL {case['name']}: missing={sorted(missing)}, unexpected={sorted(unexpected)}")
+    if adversarial_cases == 0:
+        print("FAIL evaluation suite: no adversarial cases are registered")
+        return 0, len(cases), total_expected + total_predicted
+    print(f"Adversarial cases covered: {adversarial_cases}")
     return passed, len(cases), total_expected + total_predicted
 
 

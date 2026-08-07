@@ -75,7 +75,7 @@ def enforce_patient_access(request: Request, patient_id: str) -> str:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Invalid patient_id") from exc
     auth = getattr(request.state, "auth", None)
-    if auth is not None and auth.mode == "oidc":
+    if auth is not None and auth.mode in {"oidc", "token"} and auth.patient_id:
         if not auth.patient_id:
             raise HTTPException(status_code=403, detail="Token is not associated with a patient")
         if normalized != auth.patient_id:
@@ -143,10 +143,15 @@ def require_security(
     if settings.auth_mode == "oidc":
         context = _oidc_context(credentials.credentials, settings)
     else:
+        if settings.environment not in {"development", "test"} and not settings.token_patient_id:
+            raise HTTPException(
+                status_code=503,
+                detail="Token authentication is single-tenant only; configure SMRITI_TOKEN_PATIENT_ID",
+            )
         if not settings.api_token:
             raise HTTPException(status_code=503, detail="Token authentication is not configured")
         if not compare_digest(credentials.credentials, settings.api_token):
             raise HTTPException(status_code=401, detail="Invalid bearer token")
-        context = AuthContext(subject="static-token", patient_id=None, mode="token")
+        context = AuthContext(subject="static-token", patient_id=settings.token_patient_id, mode="token")
     request.state.auth = context
     limiter.check(f"subject:{context.subject}", settings.rate_limit_per_minute)

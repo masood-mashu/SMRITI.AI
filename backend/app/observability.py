@@ -15,6 +15,7 @@ from .integrations import get_audit_sink
 logger = logging.getLogger("smriti.audit")
 _metrics = Counter()
 _metrics_lock = Lock()
+_redis_metrics = None
 _tracer = None
 try:
     from opentelemetry import trace
@@ -50,15 +51,37 @@ def audit_log(event: str, **fields: Any) -> None:
 
 
 def record_metric(name: str, value: int = 1, **labels: str) -> None:
-    """Record low-cardinality process metrics without storing request contents."""
+    """Record low-cardinality metrics, using Redis when configured for production."""
     key = name + "{" + ",".join(f"{k}={labels[k]}" for k in sorted(labels)) + "}"
+    if os.getenv("METRICS_BACKEND", "memory").lower() == "redis":
+        try:
+            global _redis_metrics
+            if _redis_metrics is None:
+                import redis
+
+                url = os.getenv("REDIS_URL")
+                if not url:
+                    raise RuntimeError("REDIS_URL is required for Redis metrics")
+                _redis_metrics = redis.Redis.from_url(url, decode_responses=True)
+            _redis_metrics.hincrby("smriti:metrics", key, value)
+            return
+        except Exception as exc:
+            logger.warning("metrics_backend_error=%s", exc)
     with _metrics_lock:
         _metrics[key] += value
 
 
 def prometheus_metrics() -> str:
-    with _metrics_lock:
-        snapshot = dict(_metrics)
+    snapshot = None
+    if os.getenv("METRICS_BACKEND", "memory").lower() == "redis":
+        try:
+            if _redis_metrics is not None:
+                snapshot = {str(key): int(value) for key, value in _redis_metrics.hgetall("smriti:metrics").items()}
+        except Exception as exc:
+            logger.warning("metrics_backend_error=%s", exc)
+    if snapshot is None:
+        with _metrics_lock:
+            snapshot = dict(_metrics)
     lines = ["# TYPE smriti_events_total counter"]
     for key, value in sorted(snapshot.items()):
         event, raw_labels = key.split("{", 1)

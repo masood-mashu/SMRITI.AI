@@ -49,10 +49,21 @@ def init_db() -> None:
             "reviewed_at": "DATETIME",
             "reviewed_by": "TEXT",
         }
+        ingestion_columns = {column["name"] for column in inspect(engine).get_columns("ingestion_jobs")}
+        ingestion_additions = {
+            "filename": "TEXT NOT NULL DEFAULT 'report'",
+            "content_type": "TEXT NOT NULL DEFAULT 'application/octet-stream'",
+            "use_fixture": "BOOLEAN NOT NULL DEFAULT 0",
+            "pii_redactions": "INTEGER NOT NULL DEFAULT 0",
+            "pii_provider": "TEXT NOT NULL DEFAULT 'unknown'",
+        }
         with engine.begin() as connection:
             for name, data_type in additions.items():
                 if name not in columns:
                     connection.execute(text(f"ALTER TABLE contradictions ADD COLUMN {name} {data_type}"))
+            for name, data_type in ingestion_additions.items():
+                if name not in ingestion_columns:
+                    connection.execute(text(f"ALTER TABLE ingestion_jobs ADD COLUMN {name} {data_type}"))
     _initialized = True
 
 

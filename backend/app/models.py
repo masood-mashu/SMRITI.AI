@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Column, Index, Text, text
+from sqlalchemy import JSON, Column, DateTime, Index, REAL, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
@@ -17,7 +17,7 @@ class Patient(SQLModel, table=True):
     __tablename__ = "patients"
     patient_id: UUID = Field(default_factory=uuid4, primary_key=True)
     display_name: str = Field(sa_column=Column(Text, nullable=False))
-    created_at: datetime = Field(default_factory=utc_now, nullable=False)
+    created_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
 
 
 class Report(SQLModel, table=True):
@@ -26,7 +26,7 @@ class Report(SQLModel, table=True):
     report_id: UUID = Field(default_factory=uuid4, primary_key=True)
     patient_id: UUID = Field(foreign_key="patients.patient_id", nullable=False)
     source_type: str = Field(sa_column=Column(Text, nullable=False))
-    uploaded_at: datetime = Field(default_factory=utc_now, nullable=False)
+    uploaded_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
     file_url: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
     raw_extraction: Optional[dict[str, Any]] = Field(
         default=None,
@@ -41,11 +41,16 @@ class IngestionJob(SQLModel, table=True):
     patient_id: UUID = Field(foreign_key="patients.patient_id", nullable=False)
     report_id: Optional[UUID] = Field(default=None, foreign_key="reports.report_id")
     file_url: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    filename: str = Field(default="report", sa_column=Column(Text, nullable=False))
+    content_type: str = Field(default="application/octet-stream", sa_column=Column(Text, nullable=False))
     source_type: str = Field(sa_column=Column(Text, nullable=False))
+    use_fixture: bool = Field(default=False, nullable=False)
+    pii_redactions: int = Field(default=0, nullable=False)
+    pii_provider: str = Field(default="unknown", sa_column=Column(Text, nullable=False))
     status: str = Field(default="pending", sa_column=Column(Text, nullable=False))
     error: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
-    created_at: datetime = Field(default_factory=utc_now, nullable=False)
-    updated_at: datetime = Field(default_factory=utc_now, nullable=False)
+    created_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
+    updated_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
 
 
 class HealthFact(SQLModel, table=True):
@@ -71,9 +76,9 @@ class HealthFact(SQLModel, table=True):
     status: str = Field(default="active", sa_column=Column(Text, nullable=False, server_default="active"))
     is_emergency_relevant: bool = Field(default=False, nullable=False)
     effective_date: date
-    recorded_at: datetime = Field(default_factory=utc_now, nullable=False)
+    recorded_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
     superseded_by: Optional[UUID] = Field(default=None, foreign_key="health_facts.fact_id")
-    confidence: Optional[float] = None
+    confidence: Optional[float] = Field(default=None, sa_column=Column(REAL, nullable=True))
 
 
 class Contradiction(SQLModel, table=True):
@@ -84,9 +89,12 @@ class Contradiction(SQLModel, table=True):
     fact_id_older: UUID = Field(foreign_key="health_facts.fact_id", nullable=False)
     fact_id_newer: UUID = Field(foreign_key="health_facts.fact_id", nullable=False)
     description: str = Field(sa_column=Column(Text, nullable=False))
-    detected_at: datetime = Field(default_factory=utc_now, nullable=False)
+    detected_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
     resolved: bool = Field(default=False, nullable=False)
     review_decision: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
     reviewer_note: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
-    reviewed_at: Optional[datetime] = Field(default=None, nullable=True)
+    reviewed_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
     reviewed_by: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))

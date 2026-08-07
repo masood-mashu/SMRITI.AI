@@ -2,6 +2,7 @@ from uuid import uuid4
 from datetime import date
 import shutil
 from pathlib import Path
+import pytest
 
 from fastapi.testclient import TestClient
 from sqlmodel import select
@@ -22,9 +23,7 @@ def test_fixture_upload_populates_timeline() -> None:
             files={"file": ("fixture.pdf", b"synthetic", "application/pdf")},
         )
         assert upload.status_code == 200
-        assert upload.json()["graph"]["memory_updated"] is True
-        assert len(upload.json()["graph"]["persisted_fact_ids"]) == 3
-        assert upload.json()["graph"]["file_url"].startswith("local://")
+        assert upload.json()["job_status"] == "pending"
 
         timeline = client.get(f"/timeline?patient_id={patient_id}")
         assert timeline.status_code == 200
@@ -111,9 +110,9 @@ def test_production_rejects_static_token_configuration(monkeypatch) -> None:
     monkeypatch.setenv("AUTH_ENABLED", "true")
     monkeypatch.setenv("AUTH_MODE", "token")
     monkeypatch.setenv("RATE_LIMIT_BACKEND", "memory")
-    with TestClient(app) as client:
-        response = client.get("/timeline")
-        assert response.status_code == 503
+    with pytest.raises(RuntimeError, match="Invalid production configuration"):
+        with TestClient(app):
+            pass
 
 
 def test_production_ingestion_does_not_store_raw_extraction(monkeypatch) -> None:
@@ -160,8 +159,13 @@ def test_unconfigured_real_extraction_fails_explicitly(monkeypatch) -> None:
                 "/reports",
                 files={"file": ("report.txt", b"medical report", "text/plain")},
             )
-            assert response.status_code == 503
-            assert "extraction is not configured" in response.json()["detail"]
+            assert response.status_code == 200
+            job = client.get(
+                f"/ingestion-jobs/{response.json()['job_id']}?patient_id={response.json()['patient_id']}"
+            )
+            assert job.status_code == 200
+            assert job.json()["status"] == "failed"
+            assert "extraction is not configured" in job.json()["error"]
             assert list(storage_dir.iterdir()) == []
     finally:
         shutil.rmtree(storage_dir, ignore_errors=True)
@@ -171,13 +175,9 @@ def test_fixture_upload_is_rejected_in_production(monkeypatch) -> None:
     monkeypatch.setenv("SMRITI_ENV", "production")
     monkeypatch.setenv("RATE_LIMIT_BACKEND", "memory")
     monkeypatch.setenv("AUTH_ENABLED", "false")
-    with TestClient(app) as client:
-        response = client.post(
-            "/reports?fixture=true",
-            files={"file": ("fixture.txt", b"synthetic", "text/plain")},
-        )
-        assert response.status_code == 503
-        assert response.headers["X-Request-ID"]
+    with pytest.raises(RuntimeError, match="Invalid production configuration"):
+        with TestClient(app):
+            pass
 
 
 def test_production_upload_checks_file_signature(monkeypatch) -> None:

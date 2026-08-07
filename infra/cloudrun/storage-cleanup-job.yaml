@@ -1,0 +1,24 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: smriti-storage-cleanup
+spec:
+  template:
+    spec:
+      template:
+        spec:
+          serviceAccountName: SMRITI_RUNTIME_SERVICE_ACCOUNT
+          containers:
+            - image: REGION-docker.pkg.dev/PROJECT/smriti/api:TAG
+              command: ["python"]
+              args: ["scripts/cleanup_storage.py"]
+              env:
+                - name: LOCAL_STORAGE_DIR
+                  value: /app/.data/uploads
+                - name: STORAGE_RETENTION_DAYS
+                  value: "30"
+              resources:
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
+          maxRetries: 3

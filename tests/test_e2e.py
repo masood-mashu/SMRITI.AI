@@ -15,7 +15,7 @@ def test_patient_flow_upload_memory_mcp_and_outputs(monkeypatch) -> None:
             files={"file": ("synthetic.txt", b"synthetic", "text/plain")},
         )
         assert upload.status_code == 200
-        assert upload.json()["graph"]["memory_updated"] is True
+        assert upload.json()["job_status"] == "pending"
 
         timeline = client.get(f"/timeline?patient_id={patient_id}")
         assert timeline.status_code == 200

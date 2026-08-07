@@ -104,8 +104,12 @@ if uploaded and st.button("Process report", type="primary"):
             },
             files={"file": (uploaded.name, uploaded.getvalue(), uploaded.type)},
         )
-        st.success("Report accepted and merged into health memory.")
-        graph = result["graph"]
+        st.success(f"Report accepted for background processing (job `{result['job_id']}`).")
+        if "graph" not in result:
+            st.info("Refresh the timeline after background processing completes.")
+            graph = {}
+        else:
+            graph = result["graph"]
         st.info(graph.get("explanation", "Report processed."))
         st.caption(
             f"Provider: {graph.get('extraction_provider', 'unknown')} · "

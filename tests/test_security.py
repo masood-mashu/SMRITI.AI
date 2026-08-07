@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from backend.app.main import app
 from backend.app.security import AuthContext, rate_limiter
@@ -52,5 +53,24 @@ def test_production_redis_limiter_requires_configuration(monkeypatch) -> None:
     monkeypatch.setenv("AUTH_ENABLED", "false")
     monkeypatch.delenv("REDIS_URL", raising=False)
     monkeypatch.delenv("RATE_LIMIT_BACKEND", raising=False)
+    with pytest.raises(RuntimeError, match="Invalid production configuration"):
+        with TestClient(app):
+            pass
+
+
+def test_token_mode_is_single_tenant_outside_development(monkeypatch) -> None:
+    rate_limiter._events.clear()
+    patient_id = "11111111-1111-1111-1111-111111111111"
+    monkeypatch.setenv("SMRITI_ENV", "staging")
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    monkeypatch.setenv("AUTH_MODE", "token")
+    monkeypatch.setenv("SMRITI_API_TOKEN", "test-token")
+    monkeypatch.setenv("SMRITI_TOKEN_PATIENT_ID", patient_id)
+    monkeypatch.setenv("RATE_LIMIT_BACKEND", "memory")
     with TestClient(app) as client:
-        assert client.get("/timeline").status_code == 503
+        headers = {"Authorization": "Bearer test-token"}
+        assert client.get(f"/timeline?patient_id={patient_id}", headers=headers).status_code == 200
+        assert client.get(
+            "/timeline?patient_id=22222222-2222-2222-2222-222222222222",
+            headers=headers,
+        ).status_code == 403

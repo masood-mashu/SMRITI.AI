@@ -29,3 +29,18 @@ Before deployment, provision these Secret Manager entries:
 - `smriti-gcs-bucket`
 - `smriti-gcs-kms-key`
 - `smriti-api-token` for the frontend
+- `smriti-ingestion-worker-token` for authenticated Cloud Tasks callbacks
+
+Create the ingestion queue and deploy the worker-capable API before enabling
+production uploads:
+
+```powershell
+gcloud tasks queues create smriti-ingestion --location=REGION
+gcloud run jobs replace infra/cloudrun/storage-cleanup-job.yaml
+gcloud scheduler jobs create http smriti-storage-cleanup --schedule="0 3 * * *" `
+  --uri="https://run.googleapis.com/apis/run.googleapis.com/v1/projects/PROJECT/locations/REGION/jobs/smriti-storage-cleanup:run" `
+  --http-method=POST --oauth-service-account-email=SMRITI_SCHEDULER_SERVICE_ACCOUNT
+```
+
+For GCS-backed production storage, apply the bucket lifecycle policy in
+`infra/gcs/lifecycle.json` instead of relying on the local cleanup job.

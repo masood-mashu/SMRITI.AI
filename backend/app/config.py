@@ -16,6 +16,7 @@ class Settings:
     db_auto_create: bool
     auth_enabled: bool
     api_token: str | None
+    token_patient_id: str | None
     rate_limit_per_minute: int
     rate_limit_backend: str
     redis_url: str | None
@@ -35,6 +36,7 @@ class Settings:
             db_auto_create=_bool("DB_AUTO_CREATE", auto_create_default),
             auth_enabled=_bool("AUTH_ENABLED", environment == "production"),
             api_token=os.getenv("SMRITI_API_TOKEN") or None,
+            token_patient_id=os.getenv("SMRITI_TOKEN_PATIENT_ID") or None,
             rate_limit_per_minute=max(1, int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))),
             rate_limit_backend=os.getenv("RATE_LIMIT_BACKEND", "redis" if environment == "production" else "memory"),
             redis_url=os.getenv("REDIS_URL") or None,
@@ -49,7 +51,7 @@ settings = Settings.from_env()
 
 
 def validate_production_settings() -> None:
-    """Fail closed when an explicitly validated production deployment is misconfigured."""
+    """Fail closed when a production deployment is misconfigured."""
     if os.getenv("SMRITI_ENV", "development").lower() != "production":
         return
     required = {
@@ -59,10 +61,22 @@ def validate_production_settings() -> None:
         "UPLOAD_SIGNATURE_CHECK": os.getenv("UPLOAD_SIGNATURE_CHECK", "true").lower()
         in {"1", "true", "yes", "on"},
         "RATE_LIMIT_BACKEND": os.getenv("RATE_LIMIT_BACKEND", "").lower() == "redis",
+        "METRICS_BACKEND": os.getenv("METRICS_BACKEND", "").lower() == "redis",
+        "INGESTION_QUEUE_PROVIDER": os.getenv("INGESTION_QUEUE_PROVIDER", "").lower() == "cloud_tasks",
         "STORE_RAW_EXTRACTION": os.getenv("STORE_RAW_EXTRACTION", "false").lower() in {"0", "false", "no", "off"},
     }
     missing = [name for name, valid in required.items() if not valid]
-    for name in ("DATABASE_URL", "REDIS_URL", "OIDC_ISSUER", "OIDC_AUDIENCE"):
+    for name in (
+        "DATABASE_URL",
+        "REDIS_URL",
+        "OIDC_ISSUER",
+        "OIDC_AUDIENCE",
+        "GCP_PROJECT",
+        "INGESTION_QUEUE_LOCATION",
+        "INGESTION_QUEUE_NAME",
+        "INGESTION_WORKER_URL",
+        "INGESTION_WORKER_TOKEN",
+    ):
         if not os.getenv(name):
             missing.append(name)
     storage_provider = os.getenv("STORAGE_PROVIDER", "").lower()
