@@ -7,12 +7,17 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import select
 
-from backend.app.db import session_scope
+from backend.app.db import normalize_database_url, session_scope
 from backend.app.graph import smriti_ingestion_graph
 from backend.app.main import app
 from backend.app.models import Contradiction, Report
 from backend.app.repositories import persist_report_and_facts
 from backend.app.security import rate_limiter
+
+
+def test_plain_postgresql_url_uses_psycopg_driver() -> None:
+    assert normalize_database_url("postgresql://user:pass@host/db") == "postgresql+psycopg://user:pass@host/db"
+    assert normalize_database_url("postgres://user:pass@host/db") == "postgresql+psycopg://user:pass@host/db"
 
 
 def test_fixture_upload_populates_timeline() -> None:

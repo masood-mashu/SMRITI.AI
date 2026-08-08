@@ -11,7 +11,16 @@ from . import models  # noqa: F401 - registers all table models
 from .config import settings
 
 
-DATABASE_URL = settings.database_url
+def normalize_database_url(url: str) -> str:
+    """Prefer the installed psycopg v3 driver for plain PostgreSQL URLs."""
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    return url
+
+
+DATABASE_URL = normalize_database_url(settings.database_url)
 DB_AUTO_CREATE = settings.db_auto_create
 _is_sqlite = DATABASE_URL.startswith("sqlite")
 engine_options = {

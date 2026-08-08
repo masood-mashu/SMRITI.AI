@@ -6,3 +6,5 @@ python-multipart==0.0.32
 requests==2.34.2
 PyJWT[crypto]==2.13.0
 cryptography==50.0.0
+google-genai>=1.0,<2.0
+google-cloud-storage>=2.18,<3.0

@@ -11,6 +11,8 @@ dependencies = [
     "requests>=2.32,<3.0",
     "PyJWT[crypto]>=2.9,<3.0",
     "cryptography>=50.0,<51.0",
+    "google-genai>=1.0,<2.0",
+    "google-cloud-storage>=2.18,<3.0",
 ]
 
 [build-system]
