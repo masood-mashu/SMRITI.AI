@@ -3,81 +3,504 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Smriti AI — Synthetic Demo</title>
+  <meta name="theme-color" content="#f6f3ec">
+  <title>Smriti — Health memory</title>
   <style>
-    :root { color-scheme: light; --ink:#172033; --muted:#64748b; --brand:#2563eb; --soft:#eff6ff; --line:#dbe4f0; }
-    * { box-sizing:border-box; } body { margin:0; background:#f8fafc; color:var(--ink); font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
-    main { max-width:1080px; margin:auto; padding:24px 20px 64px; } header { margin-bottom:24px; }
-    .topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:42px; }
-    .wordmark { color:var(--ink); font-weight:800; letter-spacing:-.02em; text-decoration:none; }
-    .add-report { display:inline-flex; align-items:center; gap:8px; margin:0; padding:12px 18px; border:0; border-radius:12px; background:var(--brand); color:white; font-weight:700; text-decoration:none; box-shadow:0 6px 16px #2563eb33; }
-    .add-report:hover { background:#1d4ed8; }
-    .add-report span { font-size:1.25rem; line-height:1; }
-    .eyebrow { color:var(--brand); font-size:.78rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; margin:0 0 8px; }
-    h1 { margin:0 0 6px; font-size:clamp(2rem,5vw,3.5rem); letter-spacing:-.04em; } h2 { margin-top:0; }
-    .notice { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:12px 14px; border-radius:12px; margin:18px 0; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; } .card { background:white; border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:0 4px 18px #1720330b; }
-    label { display:block; font-weight:650; margin:12px 0 6px; } textarea, select { width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px; font:inherit; } textarea { min-height:150px; resize:vertical; }
-    button { border:0; border-radius:10px; background:var(--brand); color:white; padding:10px 15px; font-weight:700; cursor:pointer; margin:12px 8px 0 0; } button.secondary { background:#e2e8f0; color:var(--ink); }
-    pre { white-space:pre-wrap; background:var(--soft); padding:14px; border-radius:10px; min-height:60px; } .muted { color:var(--muted); } .facts { display:grid; gap:8px; } .fact { border-left:4px solid #60a5fa; padding:8px 12px; background:#f8fbff; }
-    .status { min-height:24px; color:var(--muted); } .error { color:#b91c1c; } @media (max-width:600px) { main { padding:22px 14px 40px; } }
+    :root {
+      color-scheme: light;
+      --ink: #17231f;
+      --muted: #708079;
+      --line: #e2e8e1;
+      --paper: #fffefa;
+      --canvas: #f6f3ec;
+      --panel: #eef4ee;
+      --green: #1d6b55;
+      --green-dark: #124d3d;
+      --mint: #cfe8d7;
+      --gold: #dcae4d;
+      --red: #b6524e;
+      --shadow: 0 18px 48px rgba(33, 59, 48, .08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); font: 15px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, textarea, select { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { border: 0; cursor: pointer; }
+    button:disabled { cursor: wait; opacity: .62; }
+    a { color: inherit; text-decoration: none; }
+    .app { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+    .sidebar { display: flex; flex-direction: column; padding: 28px 18px 20px; background: #edf3ec; border-right: 1px solid var(--line); }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 10px; margin-bottom: 52px; font-weight: 800; letter-spacing: .13em; font-size: .83rem; }
+    .brand-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px 10px 10px 2px; color: white; background: var(--green); font-size: 16px; letter-spacing: 0; }
+    .nav-label { padding: 0 12px; color: #95a29b; font-size: .68rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    .nav { display: grid; gap: 5px; margin-top: 10px; }
+    .nav a { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 12px; color: #708079; font-weight: 650; transition: .2s ease; }
+    .nav a:hover, .nav a.active { color: var(--green-dark); background: #dcecdf; }
+    .nav-icon { width: 19px; text-align: center; font-size: 1rem; }
+    .side-bottom { margin-top: auto; }
+    .demo-card { padding: 14px; border: 1px solid #d7e4d7; border-radius: 16px; background: rgba(255,255,255,.62); }
+    .demo-card .mini-label { color: var(--muted); font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .demo-card p { margin: 5px 0 0; color: var(--ink); font-size: .82rem; line-height: 1.35; }
+    .safe-dot { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: #56a871; }
+    .main { min-width: 0; max-width: 1440px; width: 100%; padding: 28px clamp(22px, 4vw, 60px) 60px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 44px; }
+    .mobile-brand { display: none; font-weight: 800; letter-spacing: .1em; }
+    .topbar-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+    .patient-chip { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: .78rem; }
+    .avatar { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: var(--green-dark); background: var(--mint); font-weight: 800; }
+    .eyebrow { margin: 0 0 9px; color: var(--green); font-size: .72rem; font-weight: 850; letter-spacing: .15em; text-transform: uppercase; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 650px; margin-bottom: 14px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.55rem, 5vw, 4.7rem); font-weight: 500; letter-spacing: -.055em; line-height: .98; }
+    h2 { margin-bottom: 5px; font-family: Georgia, "Times New Roman", serif; font-size: 1.48rem; font-weight: 500; letter-spacing: -.025em; }
+    h3 { margin-bottom: 5px; font-size: .98rem; }
+    .lede { max-width: 575px; margin-bottom: 0; color: var(--muted); font-size: 1rem; }
+    .hero { display: flex; align-items: end; justify-content: space-between; gap: 28px; margin-bottom: 38px; }
+    .primary, .secondary, .icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 17px; border-radius: 12px; font-weight: 750; transition: transform .2s ease, background .2s ease, box-shadow .2s ease; }
+    .primary { color: white; background: var(--green); box-shadow: 0 8px 18px rgba(29,107,85,.2); }
+    .primary:hover { background: var(--green-dark); transform: translateY(-1px); }
+    .secondary { color: var(--green-dark); background: #e3eee3; }
+    .secondary:hover { background: #d5e7d7; }
+    .button-plus { font-size: 1.35rem; font-weight: 400; line-height: 0; }
+    .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .82fr); gap: 20px; align-items: start; }
+    .panel { border: 1px solid var(--line); border-radius: 20px; background: var(--paper); box-shadow: var(--shadow); }
+    .panel-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 24px 25px 18px; }
+    .panel-subtitle { margin: 0; color: var(--muted); font-size: .82rem; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0 25px 22px; }
+    .stat { padding: 15px; border-radius: 14px; background: var(--panel); }
+    .stat-value { display: block; margin-bottom: 2px; color: var(--green-dark); font-family: Georgia, serif; font-size: 1.75rem; line-height: 1; }
+    .stat-label { color: var(--muted); font-size: .72rem; }
+    .timeline-list { display: grid; gap: 10px; padding: 4px 25px 25px; }
+    .fact { display: grid; grid-template-columns: 11px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 14px 15px; border: 1px solid #e8eee7; border-radius: 14px; background: #fbfdf9; }
+    .fact-bar { width: 5px; min-height: 44px; border-radius: 6px; background: var(--green); }
+    .fact-bar.allergy { background: var(--red); }
+    .fact-bar.medication { background: var(--gold); }
+    .fact-key { margin-bottom: 2px; font-weight: 800; }
+    .fact-value { color: var(--muted); font-size: .86rem; }
+    .fact-date { color: #8a9690; font-size: .72rem; white-space: nowrap; }
+    .empty { padding: 25px; color: var(--muted); text-align: center; }
+    .empty strong { display: block; margin-bottom: 4px; color: var(--ink); }
+    .contradiction { margin: 0 25px 25px; padding: 13px 15px; border: 1px solid #f0d9b6; border-radius: 13px; color: #8f641f; background: #fff9ee; font-size: .84rem; }
+    .contradiction strong { display: block; margin-bottom: 3px; }
+    .output-panel { min-height: 370px; overflow: hidden; background: var(--green-dark); color: white; }
+    .output-panel .panel-head { padding-bottom: 14px; }
+    .output-panel h2 { color: white; }
+    .output-panel .panel-subtitle { color: #b7d0c1; }
+    .output-body { min-height: 200px; padding: 9px 25px 25px; }
+    .output-placeholder { display: grid; place-items: center; min-height: 220px; padding: 25px; border: 1px dashed #5d8775; border-radius: 15px; color: #b7d0c1; text-align: center; }
+    .output-placeholder .spark { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 12px; border-radius: 14px; color: #173e32; background: #d4ead8; font-size: 1.3rem; }
+    .output-copy { white-space: pre-wrap; color: #f2f8f0; font-family: inherit; font-size: .91rem; line-height: 1.7; }
+    .output-actions { display: grid; gap: 9px; padding: 0 25px 25px; }
+    .output-actions button { justify-content: flex-start; min-height: 43px; color: #eaf5eb; background: rgba(255,255,255,.1); }
+    .output-actions button:hover, .output-actions button.selected { background: rgba(255,255,255,.2); }
+    .output-actions button span { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 8px; color: var(--green-dark); background: #d6ead9; }
+    .language-row { display: flex; align-items: center; gap: 9px; margin-top: 2px; }
+    .language-row select { flex: 1; min-height: 42px; padding: 0 10px; border: 1px solid #5d8775; border-radius: 11px; color: #f2f8f0; background: #285e4d; outline: none; }
+    .language-row button { min-width: 95px; }
+    .footer-note { margin: 23px 2px 0; color: #8a9690; font-size: .74rem; }
+    .modal-backdrop { display: none; position: fixed; inset: 0; z-index: 10; place-items: center; padding: 20px; background: rgba(18, 39, 31, .46); backdrop-filter: blur(5px); }
+    .modal-backdrop.open { display: grid; }
+    .modal { width: min(560px, 100%); padding: 28px; border: 1px solid var(--line); border-radius: 22px; background: var(--paper); box-shadow: 0 26px 80px rgba(18,39,31,.25); }
+    .modal-head { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+    .modal-head h2 { margin-bottom: 4px; font-size: 1.8rem; }
+    .close { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: var(--muted); background: #eef3ed; font-size: 1.2rem; }
+    .close:hover { color: var(--ink); background: #e3ebe2; }
+    label { display: block; margin: 16px 0 7px; font-size: .78rem; font-weight: 800; letter-spacing: .03em; }
+    textarea, select { width: 100%; border: 1px solid #ccd9cc; border-radius: 12px; color: var(--ink); background: #fbfdf9; outline: none; }
+    textarea:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(29,107,85,.12); }
+    textarea { min-height: 145px; padding: 13px; resize: vertical; }
+    .modal select { min-height: 44px; padding: 0 12px; }
+    .modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 19px; }
+    .modal-foot small { color: var(--muted); }
+    .status { min-height: 22px; margin-top: 12px; color: var(--muted); font-size: .82rem; }
+    .status.error { color: var(--red); }
+    .toast { position: fixed; right: 22px; bottom: 22px; z-index: 20; max-width: 340px; padding: 13px 16px; border: 1px solid #cfe5d2; border-radius: 13px; color: var(--green-dark); background: #f4fbf2; box-shadow: var(--shadow); transform: translateY(20px); opacity: 0; pointer-events: none; transition: .25s ease; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.error { color: #8f3838; border-color: #f0cece; background: #fff5f3; }
+    .loading { display: inline-flex; align-items: center; gap: 8px; }
+    .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 72px minmax(0, 1fr); }
+      .sidebar { padding: 25px 11px 18px; }
+      .brand { justify-content: center; padding: 0; margin-bottom: 48px; }
+      .brand-word, .nav-label, .nav a span:not(.nav-icon), .demo-card { display: none; }
+      .nav a { justify-content: center; padding: 12px 8px; }
+      .side-bottom { display: flex; justify-content: center; }
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .output-panel { min-height: auto; }
+    }
+    @media (max-width: 640px) {
+      .app { display: block; }
+      .sidebar { display: none; }
+      .main { padding: 19px 16px 42px; }
+      .topbar { margin-bottom: 35px; }
+      .mobile-brand { display: block; }
+      .patient-chip { display: none; }
+      .hero { display: block; margin-bottom: 27px; }
+      .hero .primary { width: 100%; margin-top: 22px; }
+      h1 { font-size: 3rem; }
+      .panel-head { padding: 20px 18px 15px; }
+      .stats { padding: 0 18px 18px; }
+      .stat { padding: 12px 10px; }
+      .stat-value { font-size: 1.45rem; }
+      .timeline-list { padding: 4px 18px 18px; }
+      .fact { grid-template-columns: 8px minmax(0, 1fr); gap: 9px; }
+      .fact-date { grid-column: 2; }
+      .contradiction { margin: 0 18px 18px; }
+      .output-body { padding: 7px 18px 18px; }
+      .output-actions { padding: 0 18px 18px; }
+      .modal { padding: 22px 18px; }
+      .modal-foot { align-items: stretch; flex-direction: column; }
+      .modal-foot .primary { width: 100%; }
+    }
   </style>
 </head>
 <body>
-<main>
-  <nav class="topbar" aria-label="Primary navigation">
-    <a class="wordmark" href="#top">SMRITI AI</a>
-    <a class="add-report" href="#add-report"><span aria-hidden="true">+</span> Add report</a>
-  </nav>
-  <header id="top">
-    <p class="muted">Patient-owned health memory · judge demo</p>
-    <h1>Smriti AI</h1>
-    <p>Turn a synthetic medical report into a reviewable health timeline and concise emergency-ready outputs.</p>
-    <div class="notice"><strong>Demo safety:</strong> synthetic data only. This deployment does not accept real patient information, PDF/image PHI, or live clinical AI calls.</div>
-  </header>
-  <section class="grid">
-    <div class="card" id="add-report">
-      <h2>1. Add a report</h2>
-      <p class="muted">Start building your health memory in seconds.</p>
-      <label for="report">Report text</label>
-      <textarea id="report">Synthetic report: diabetes, metformin 500 mg, and severe penicillin reaction.</textarea>
-      <button id="process" class="add-report"><span aria-hidden="true">+</span> Add report</button>
-      <div id="status" class="status"></div>
+  <div class="app">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <a class="brand" href="#top"><span class="brand-mark">✦</span><span class="brand-word">SMRITI</span></a>
+      <span class="nav-label">Workspace</span>
+      <nav class="nav">
+        <a class="active" href="#top"><span class="nav-icon">⌂</span><span>Overview</span></a>
+        <a href="#timeline-section"><span class="nav-icon">◷</span><span>Health memory</span></a>
+        <a href="#outputs"><span class="nav-icon">✧</span><span>AI outputs</span></a>
+      </nav>
+      <div class="side-bottom">
+        <div class="demo-card">
+          <span class="mini-label"><span class="safe-dot"></span>Demo mode</span>
+          <p>Synthetic data only. Your memory stays in this browser session.</p>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main" id="top">
+      <div class="topbar">
+        <a class="mobile-brand" href="#top">✦ SMRITI</a>
+        <div class="topbar-actions">
+          <span class="patient-chip"><span class="avatar">M</span><span>Demo patient</span></span>
+          <button class="secondary" id="refresh-top" type="button">↻ Refresh</button>
+          <button class="primary" id="auth-action" type="button" hidden>Sign in</button>
+        </div>
+      </div>
+
+      <section class="hero" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Your health memory</p>
+          <h1 id="page-title">A clearer picture of your health, over time.</h1>
+          <p class="lede">Smriti turns medical reports into a living memory you can understand, review, and share when it matters.</p>
+        </div>
+        <button class="primary" id="open-report" type="button"><span class="button-plus">+</span> Add a report</button>
+      </section>
+
+      <div class="dashboard-grid">
+        <section class="panel" id="timeline-section" aria-labelledby="memory-title">
+          <div class="panel-head">
+            <div>
+              <h2 id="memory-title">Health memory</h2>
+              <p class="panel-subtitle" id="sync-label">Loading your latest facts…</p>
+            </div>
+            <button class="icon-button secondary" id="refresh-memory" type="button" aria-label="Refresh health memory">↻</button>
+          </div>
+          <div class="stats" aria-label="Memory summary">
+            <div class="stat"><span class="stat-value" id="fact-count">—</span><span class="stat-label">facts recorded</span></div>
+            <div class="stat"><span class="stat-value" id="current-count">—</span><span class="stat-label">current facts</span></div>
+            <div class="stat"><span class="stat-value" id="alert-count">—</span><span class="stat-label">needs review</span></div>
+          </div>
+          <div class="timeline-list" id="timeline-list" aria-live="polite">
+            <div class="empty"><strong>Loading your memory</strong><span>Facts will appear here after your first report.</span></div>
+          </div>
+          <div id="contradictions"></div>
+        </section>
+
+        <section class="panel output-panel" id="outputs" aria-labelledby="outputs-title">
+          <div class="panel-head">
+            <div>
+              <h2 id="outputs-title">Make it useful</h2>
+              <p class="panel-subtitle">Turn your memory into a ready-to-use view.</p>
+            </div>
+            <span aria-hidden="true">✧</span>
+          </div>
+          <div class="output-body" id="output-body">
+            <div class="output-placeholder"><div><div class="spark">✦</div><strong>Choose an output</strong><br><span>Smriti will shape your saved facts into a concise view.</span></div></div>
+          </div>
+          <div class="output-actions">
+            <button type="button" data-output="brief"><span>✦</span> Doctor brief</button>
+            <button type="button" data-output="emergency"><span>+</span> Emergency card</button>
+            <div class="language-row"><select id="language" aria-label="Translation language"><option value="en">English</option><option value="hi">Hindi</option><option value="kn">Kannada</option></select><button class="secondary" type="button" data-output="translate">Translate</button></div>
+          </div>
+        </section>
+      </div>
+      <p class="footer-note">Demo environment · Synthetic information only · Smriti is an organizational aid, not a diagnosis.</p>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="report-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <div class="modal-head">
+        <div><p class="eyebrow">Grow your memory</p><h2 id="modal-title">Add a medical report</h2><p class="panel-subtitle">Start with the prepared synthetic report for this demo.</p></div>
+        <button class="close" id="close-report" type="button" aria-label="Close dialog">×</button>
+      </div>
+      <label for="source-type">Report type</label>
+      <select id="source-type"><option value="other">Other</option><option value="lab_result">Lab result</option><option value="discharge_summary">Discharge summary</option><option value="prescription">Prescription</option></select>
+      <label for="report-text">Report text</label>
+      <textarea id="report-text">Synthetic report: diabetes, metformin 500 mg, and severe penicillin reaction.</textarea>
+      <div class="modal-foot"><small>Demo mode accepts synthetic text reports only.</small><button class="primary" id="submit-report" type="button"><span class="button-plus">+</span> Add to memory</button></div>
+      <div class="status" id="report-status" aria-live="polite"></div>
     </div>
-    <div class="card">
-      <h2>2. Health timeline</h2>
-      <button id="refresh" class="secondary">Refresh timeline</button>
-      <div id="timeline" class="facts"><p class="muted">No facts loaded yet.</p></div>
-    </div>
-  </section>
-  <section class="card" style="margin-top:18px">
-    <h2>3. Explain the memory</h2>
-    <button data-output="brief">Doctor Brief</button>
-    <button data-output="emergency">Emergency Card</button>
-    <label for="language">Language</label>
-    <select id="language"><option value="en">English</option><option value="hi">Hindi</option><option value="kn">Kannada</option></select>
-    <button data-output="translate">Translate</button>
-    <pre id="output">Choose an output after processing the synthetic report.</pre>
-  </section>
-</main>
-<script>
-  const patientKey = "smriti-demo-patient";
-  const patientId = localStorage.getItem(patientKey) || crypto.randomUUID();
-  localStorage.setItem(patientKey, patientId);
-  const api = (path) => `/api${path}`;
-  const qs = () => `patient_id=${encodeURIComponent(patientId)}`;
-  const status = (text, error=false) => { const el=document.querySelector("#status"); el.textContent=text; el.className=`status${error?" error":""}`; };
-  const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[character]));
-  async function request(path, options={}) { const r=await fetch(api(path), options); const data=await r.json(); if(!r.ok) throw new Error(data.detail || `Request failed (${r.status})`); return data; }
-  async function refresh() {
-    try { const data=await request(`/timeline?${qs()}`); const box=document.querySelector("#timeline");
-      box.innerHTML=data.facts.length ? data.facts.map(f=>`<div class="fact"><strong>${escapeHtml(f.fact_key)}</strong><br>${escapeHtml(f.fact_value)}<br><small>confidence: ${escapeHtml(f.confidence ?? "not provided")}</small></div>`).join("") : '<p class="muted">No facts recorded yet.</p>';
-      if(data.contradictions.length) box.innerHTML += data.contradictions.map(c=>`<div class="fact"><strong>Review needed</strong><br>${escapeHtml(c.description)}</div>`).join("");
-    } catch(e) { status(e.message,true); }
-  }
-  document.querySelector("#process").onclick=async()=>{ try { status("Processing synthetic report…"); const text=document.querySelector("#report").value; const file=new File([text],"synthetic.txt",{type:"text/plain"}); const form=new FormData(); form.append("file",file); const data=await request(`/reports?${qs()}&fixture=true`,{method:"POST",body:form}); status(`Job ${data.job_status}. Timeline updated.`); await refresh(); } catch(e) { status(e.message,true); } };
-  document.querySelector("#refresh").onclick=refresh;
-  document.querySelectorAll("[data-output]").forEach(button=>button.onclick=async()=>{ try { const kind=button.dataset.output; const path=kind==="translate"?`/translate?${qs()}&language=${document.querySelector("#language").value}`:`/${kind}?${qs()}`; const data=await request(path,{method:"POST"}); const graph=data.graph||{}; document.querySelector("#output").textContent=graph.doctor_brief||graph.emergency_card||graph.translation||"No output returned."; } catch(e) { document.querySelector("#output").textContent=e.message; } });
-</script>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const patientKey = "smriti-demo-patient";
+      const patientId = localStorage.getItem(patientKey) || crypto.randomUUID();
+      localStorage.setItem(patientKey, patientId);
+      const authScope = "openid profile email read:memory write:reports generate:outputs delete:memory";
+      const state = { facts: [], contradictions: [], accessToken: null, authRequired: false, authClient: null, authConfig: null };
+      const $ = (selector) => document.querySelector(selector);
+      const api = (path) => `/api${path}`;
+      const query = (extra = "") => `patient_id=${encodeURIComponent(patientId)}${extra ? `&${extra}` : ""}`;
+
+      function showToast(message, error = false) {
+        const toast = $("#toast");
+        toast.textContent = message;
+        toast.className = `toast show${error ? " error" : ""}`;
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => { toast.className = "toast"; }, 3600);
+      }
+
+      function setButtonLoading(button, loading, label) {
+        if (loading) {
+          button.dataset.original = button.innerHTML;
+          button.innerHTML = '<span class="loading"><span class="spinner"></span> ' + label + '</span>';
+          button.disabled = true;
+        } else {
+          button.innerHTML = button.dataset.original || button.innerHTML;
+          button.disabled = false;
+        }
+      }
+
+      async function request(path, options = {}) {
+        const headers = new Headers(options.headers || {});
+        if (state.accessToken) headers.set("Authorization", `Bearer ${state.accessToken}`);
+        options.headers = headers;
+        const response = await fetch(api(path), options);
+        const text = await response.text();
+        let data = {};
+        try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { detail: text }; }
+        if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
+        return data;
+      }
+
+      function makeFact(fact) {
+        const item = document.createElement("article");
+        item.className = "fact";
+        const bar = document.createElement("span");
+        bar.className = `fact-bar ${fact.fact_type || ""}`;
+        const copy = document.createElement("div");
+        const key = document.createElement("div");
+        key.className = "fact-key";
+        key.textContent = fact.fact_key || "Recorded fact";
+        const value = document.createElement("div");
+        value.className = "fact-value";
+        value.textContent = fact.fact_value || "No value provided";
+        copy.append(key, value);
+        const date = document.createElement("time");
+        date.className = "fact-date";
+        date.textContent = fact.effective_date || "Date not provided";
+        item.append(bar, copy, date);
+        return item;
+      }
+
+      function renderTimeline() {
+        const list = $("#timeline-list");
+        list.replaceChildren();
+        const current = state.facts.filter((fact) => !fact.superseded_by);
+        $("#fact-count").textContent = state.facts.length;
+        $("#current-count").textContent = current.length;
+        $("#alert-count").textContent = state.contradictions.length;
+        if (!state.facts.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.innerHTML = "<strong>Your memory is ready to grow</strong><span>Add the synthetic report to see health facts here.</span>";
+          list.appendChild(empty);
+        } else {
+          current.sort((a, b) => String(b.effective_date || "").localeCompare(String(a.effective_date || ""))).forEach((fact) => list.appendChild(makeFact(fact)));
+        }
+        const review = $("#contradictions");
+        review.replaceChildren();
+        state.contradictions.slice(0, 3).forEach((item) => {
+          const note = document.createElement("div");
+          note.className = "contradiction";
+          const title = document.createElement("strong");
+          title.textContent = "Review needed";
+          const text = document.createElement("span");
+          text.textContent = item.description || "Smriti found two facts that need a closer look.";
+          note.append(title, text);
+          review.appendChild(note);
+        });
+      }
+
+      async function loadTimeline(silent = false) {
+        if (state.authRequired && !state.accessToken) {
+          $("#sync-label").textContent = "Sign in to view your private memory";
+          $("#timeline-list").innerHTML = '<div class="empty"><strong>Your memory is private</strong><span>Sign in to load your saved health history.</span></div>';
+          return;
+        }
+        if (!silent) $("#sync-label").innerHTML = '<span class="loading"><span class="spinner"></span> Updating memory…</span>';
+        try {
+          const data = await request(`/timeline?${query()}`);
+          state.facts = data.facts || [];
+          state.contradictions = data.contradictions || [];
+          renderTimeline();
+          $("#sync-label").textContent = state.facts.length ? `Last updated just now · ${state.facts.length} recorded fact${state.facts.length === 1 ? "" : "s"}` : "Your memory is ready for its first report";
+        } catch (error) {
+          $("#sync-label").textContent = "Unable to load memory";
+          if (!silent) showToast(error.message, true);
+        }
+      }
+
+      function openModal() {
+        if (state.authRequired && !state.accessToken) { signIn(); return; }
+        $("#report-modal").classList.add("open");
+        window.setTimeout(() => $("#report-text").focus(), 80);
+      }
+      function closeModal() {
+        $("#report-modal").classList.remove("open");
+        $("#report-status").textContent = "";
+      }
+
+      async function submitReport() {
+        const submit = $("#submit-report");
+        const text = $("#report-text").value.trim();
+        const status = $("#report-status");
+        if (!text) { status.textContent = "Add some report text first."; status.className = "status error"; return; }
+        status.textContent = "Reading the synthetic report and updating memory…";
+        status.className = "status";
+        setButtonLoading(submit, true, "Adding report");
+        try {
+          const file = new File([text], "synthetic.txt", { type: "text/plain" });
+          const form = new FormData();
+          form.append("file", file);
+          form.append("source_type", $("#source-type").value);
+          const result = await request(`/reports?${query("fixture=true")}`, { method: "POST", body: form });
+          await loadTimeline(true);
+          closeModal();
+          showToast(`Report added · ${result.job_status || "memory updated"}`);
+          $("#outputs").scrollIntoView({ behavior: "smooth", block: "center" });
+        } catch (error) {
+          status.textContent = error.message;
+          status.className = "status error";
+          showToast(error.message, true);
+        } finally { setButtonLoading(submit, false); }
+      }
+
+      async function generateOutput(kind, button) {
+        if (state.authRequired && !state.accessToken) { signIn(); return; }
+        const output = $("#output-body");
+        const path = kind === "translate" ? `/translate?${query(`language=${encodeURIComponent($("#language").value)}`)}` : `/${kind}?${query()}`;
+        document.querySelectorAll("[data-output]").forEach((item) => item.classList.remove("selected"));
+        button.classList.add("selected");
+        setButtonLoading(button, true, "Preparing");
+        output.innerHTML = '<div class="output-placeholder"><div><span class="loading"><span class="spinner"></span> Shaping your memory…</span></div></div>';
+        try {
+          const data = await request(path, { method: "POST" });
+          const graph = data.graph || {};
+          const text = graph.doctor_brief || graph.emergency_card || graph.translation || "No output was returned.";
+          const copy = document.createElement("div");
+          copy.className = "output-copy";
+          copy.textContent = text;
+          output.replaceChildren(copy);
+        } catch (error) {
+          output.innerHTML = "";
+          const message = document.createElement("div");
+          message.className = "output-placeholder";
+          message.textContent = error.message;
+          output.appendChild(message);
+          showToast(error.message, true);
+        } finally { setButtonLoading(button, false); }
+      }
+
+      function loadAuthSdk() {
+        return new Promise((resolve, reject) => {
+          if (window.auth0) { resolve(); return; }
+          const script = document.createElement("script");
+          script.src = "https://cdn.auth0.com/js/auth0-spa-js/2.18/auth0-spa-js.production.js";
+          script.onload = resolve;
+          script.onerror = () => reject(new Error("Auth0 client could not be loaded."));
+          document.head.appendChild(script);
+        });
+      }
+
+      function updateAuthButton() {
+        const button = $("#auth-action");
+        button.hidden = !state.authRequired;
+        if (!state.authRequired) return;
+        button.textContent = state.accessToken ? "Sign out" : "Sign in";
+        button.onclick = state.accessToken ? signOut : signIn;
+      }
+
+      function signIn() {
+        if (!state.authClient) { showToast("Authentication is not ready yet.", true); return; }
+        state.authClient.loginWithRedirect({ authorizationParams: { audience: state.authConfig.audience, scope: authScope, redirect_uri: window.location.origin } });
+      }
+
+      function signOut() {
+        state.accessToken = null;
+        state.authClient.logout({ logoutParams: { returnTo: window.location.origin } });
+      }
+
+      async function setupAuth() {
+        const config = await request("/auth/config");
+        state.authRequired = Boolean(config.enabled);
+        state.authConfig = config;
+        updateAuthButton();
+        if (!state.authRequired) return;
+        if (!config.issuer || !config.audience || !config.client_id) throw new Error("Auth0 is enabled but incompletely configured.");
+        await loadAuthSdk();
+        state.authClient = await window.auth0.createAuth0Client({
+          domain: new URL(config.issuer).host,
+          clientId: config.client_id,
+          authorizationParams: { audience: config.audience, scope: authScope, redirect_uri: window.location.origin },
+        });
+        if (window.location.search.includes("error=")) {
+          const params = new URLSearchParams(window.location.search);
+          const detail = params.get("error_description") || params.get("error") || "Authentication failed.";
+          window.history.replaceState({}, document.title, window.location.pathname);
+          throw new Error(detail);
+        }
+        if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
+          await state.authClient.handleRedirectCallback();
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        if (await state.authClient.isAuthenticated()) {
+          state.accessToken = await state.authClient.getTokenSilently({
+            authorizationParams: { audience: config.audience, scope: authScope },
+          });
+          const user = await state.authClient.getUser();
+          const label = user?.name || user?.email || "Signed-in patient";
+          document.querySelector(".patient-chip span:last-child").textContent = label;
+          document.querySelector(".avatar").textContent = (label.trim()[0] || "U").toUpperCase();
+        }
+        updateAuthButton();
+      }
+
+      $("#open-report").addEventListener("click", openModal);
+      $("#close-report").addEventListener("click", closeModal);
+      $("#submit-report").addEventListener("click", submitReport);
+      $("#refresh-memory").addEventListener("click", () => loadTimeline());
+      $("#refresh-top").addEventListener("click", () => loadTimeline());
+      $("#report-modal").addEventListener("click", (event) => { if (event.target.id === "report-modal") closeModal(); });
+      document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeModal(); });
+      document.querySelectorAll("[data-output]").forEach((button) => button.addEventListener("click", () => generateOutput(button.dataset.output, button)));
+      setupAuth().then(() => loadTimeline()).catch((error) => {
+        state.authRequired = true;
+        updateAuthButton();
+        $("#sync-label").textContent = "Authentication setup needs attention";
+        showToast(error.message, true);
+      });
+    })();
+  </script>
 </body>
 </html>

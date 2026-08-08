@@ -15,8 +15,10 @@ def utc_now() -> datetime:
 
 class Patient(SQLModel, table=True):
     __tablename__ = "patients"
+    __table_args__ = (Index("idx_patients_external_subject", "external_subject", unique=True),)
     patient_id: UUID = Field(default_factory=uuid4, primary_key=True)
     display_name: str = Field(sa_column=Column(Text, nullable=False))
+    external_subject: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True, unique=True))
     created_at: datetime = Field(default_factory=utc_now, sa_column=Column(DateTime(timezone=True), nullable=False))
 
 

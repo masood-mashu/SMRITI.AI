@@ -1,5 +1,6 @@
 fastapi==0.141.1
 sqlmodel==0.0.39
+psycopg[binary]==3.2.9
 langgraph==1.2.10
 python-multipart==0.0.32
 requests==2.34.2

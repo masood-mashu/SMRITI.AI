@@ -21,6 +21,7 @@ class Settings:
     rate_limit_backend: str
     redis_url: str | None
     auth_mode: str
+    auth0_client_id: str | None
     oidc_issuer: str | None
     oidc_audience: str | None
     oidc_jwks_url: str | None
@@ -45,6 +46,7 @@ class Settings:
             rate_limit_backend=os.getenv("RATE_LIMIT_BACKEND", "redis" if environment == "production" else "memory"),
             redis_url=os.getenv("REDIS_URL") or None,
             auth_mode=os.getenv("AUTH_MODE", "token").lower(),
+            auth0_client_id=os.getenv("AUTH0_CLIENT_ID") or None,
             oidc_issuer=os.getenv("OIDC_ISSUER") or None,
             oidc_audience=os.getenv("OIDC_AUDIENCE") or None,
             oidc_jwks_url=os.getenv("OIDC_JWKS_URL") or None,

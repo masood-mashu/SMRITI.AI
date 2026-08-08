@@ -49,6 +49,7 @@ def init_db() -> None:
             "reviewed_at": "DATETIME",
             "reviewed_by": "TEXT",
         }
+        patient_columns = {column["name"] for column in inspect(engine).get_columns("patients")}
         ingestion_columns = {column["name"] for column in inspect(engine).get_columns("ingestion_jobs")}
         ingestion_additions = {
             "filename": "TEXT NOT NULL DEFAULT 'report'",
@@ -61,6 +62,14 @@ def init_db() -> None:
             for name, data_type in additions.items():
                 if name not in columns:
                     connection.execute(text(f"ALTER TABLE contradictions ADD COLUMN {name} {data_type}"))
+            if "external_subject" not in patient_columns:
+                connection.execute(text("ALTER TABLE patients ADD COLUMN external_subject TEXT"))
+            connection.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_external_subject "
+                    "ON patients (external_subject)"
+                )
+            )
             for name, data_type in ingestion_additions.items():
                 if name not in ingestion_columns:
                     connection.execute(text(f"ALTER TABLE ingestion_jobs ADD COLUMN {name} {data_type}"))

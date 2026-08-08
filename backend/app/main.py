@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from pydantic import BaseModel, Field
 
 from .db import check_database, init_db, session_scope
-from .config import validate_production_settings
+from .config import Settings, validate_production_settings
 from .generation import GenerationError
 from .graph import (
     doctor_brief_graph,
@@ -29,6 +29,7 @@ from .repositories import (
     get_fact_timeline_page,
     get_ingestion_job,
     get_patient_contradictions,
+    ensure_patient_for_subject,
     review_contradiction,
     update_ingestion_job,
 )
@@ -156,11 +157,13 @@ async def request_observability(request: Request, call_next):
 def resolve_patient_id(patient_id: UUID | None, request: Request | None = None) -> str:
     auth = getattr(request.state, "auth", None) if request is not None else None
     if auth is not None and auth.mode == "oidc":
-        if not auth.patient_id:
-            raise HTTPException(status_code=403, detail="Token is not associated with a patient")
-        if patient_id is not None and str(patient_id) != auth.patient_id:
-            raise HTTPException(status_code=403, detail="Patient access denied")
-        return auth.patient_id
+        if auth.patient_id:
+            if patient_id is not None and str(patient_id) != auth.patient_id:
+                raise HTTPException(status_code=403, detail="Patient access denied")
+            return auth.patient_id
+        with session_scope() as session:
+            patient = ensure_patient_for_subject(session, subject=auth.subject)
+            return str(patient.patient_id)
     if patient_id is not None:
         return enforce_patient_access(request, str(patient_id)) if request is not None else str(patient_id)
     if (
@@ -254,6 +257,19 @@ def readiness() -> dict[str, str]:
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Database unavailable") from exc
     return {"status": "ready"}
+
+
+@app.get("/auth/config")
+def auth_config() -> dict[str, str | bool | None]:
+    """Return only browser-safe Auth0 configuration for the static frontend."""
+    settings = Settings.from_env()
+    enabled = settings.auth_enabled and settings.auth_mode == "oidc"
+    return {
+        "enabled": enabled,
+        "issuer": settings.oidc_issuer,
+        "audience": settings.oidc_audience,
+        "client_id": settings.auth0_client_id,
+    }
 
 
 @app.get("/metrics", dependencies=[Depends(require_security)])

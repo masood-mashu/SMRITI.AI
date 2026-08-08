@@ -26,6 +26,21 @@ def ensure_patient(session: Session, patient_id: UUID, display_name: str = "Smri
     return patient
 
 
+def ensure_patient_for_subject(
+    session: Session,
+    *,
+    subject: str,
+    display_name: str = "Smriti patient",
+) -> Patient:
+    """Return the durable patient record associated with an identity subject."""
+    patient = session.exec(select(Patient).where(Patient.external_subject == subject)).first()
+    if patient is None:
+        patient = Patient(display_name=display_name, external_subject=subject)
+        session.add(patient)
+        session.flush()
+    return patient
+
+
 def create_ingestion_job(
     session: Session,
     *,

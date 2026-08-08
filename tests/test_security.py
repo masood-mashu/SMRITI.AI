@@ -48,6 +48,24 @@ def test_oidc_context_is_restricted_to_claimed_patient(monkeypatch) -> None:
         ).status_code == 403
 
 
+def test_oidc_subject_gets_stable_patient_when_claim_has_no_patient_id(monkeypatch) -> None:
+    rate_limiter._events.clear()
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    monkeypatch.setenv("AUTH_MODE", "oidc")
+    monkeypatch.setenv("RATE_LIMIT_BACKEND", "memory")
+    monkeypatch.setattr(
+        "backend.app.security._oidc_context",
+        lambda token, settings: AuthContext(subject="stable-user", patient_id=None, mode="oidc"),
+    )
+    with TestClient(app) as client:
+        headers = {"Authorization": "Bearer signed-token"}
+        first = client.get("/timeline", headers=headers)
+        second = client.get("/timeline", headers=headers)
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert first.json()["patient_id"] == second.json()["patient_id"]
+
+
 def test_production_redis_limiter_requires_configuration(monkeypatch) -> None:
     monkeypatch.setenv("SMRITI_ENV", "production")
     monkeypatch.setenv("AUTH_ENABLED", "false")
