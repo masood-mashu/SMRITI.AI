@@ -1,0 +1,15 @@
+.venv/
+.data/
+*.db
+.coverage
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+tests/
+infra/
+frontend/
+samples/
+architecture/
+smriti-ai-audit-verified.md
+smriti-ai-production-readiness-audit_by_claude.md
+smriti.egg-info/

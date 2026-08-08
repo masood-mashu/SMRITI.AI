@@ -13,3 +13,7 @@ samples/*
 .data/
 .coverage
 htmlcov/
+.vercel/
+*.log
+dist/
+build/
