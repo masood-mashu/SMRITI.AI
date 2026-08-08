@@ -7,7 +7,13 @@
   <style>
     :root { color-scheme: light; --ink:#172033; --muted:#64748b; --brand:#2563eb; --soft:#eff6ff; --line:#dbe4f0; }
     * { box-sizing:border-box; } body { margin:0; background:#f8fafc; color:var(--ink); font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
-    main { max-width:1080px; margin:auto; padding:32px 20px 64px; } header { margin-bottom:24px; }
+    main { max-width:1080px; margin:auto; padding:24px 20px 64px; } header { margin-bottom:24px; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:42px; }
+    .wordmark { color:var(--ink); font-weight:800; letter-spacing:-.02em; text-decoration:none; }
+    .add-report { display:inline-flex; align-items:center; gap:8px; margin:0; padding:12px 18px; border:0; border-radius:12px; background:var(--brand); color:white; font-weight:700; text-decoration:none; box-shadow:0 6px 16px #2563eb33; }
+    .add-report:hover { background:#1d4ed8; }
+    .add-report span { font-size:1.25rem; line-height:1; }
+    .eyebrow { color:var(--brand); font-size:.78rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; margin:0 0 8px; }
     h1 { margin:0 0 6px; font-size:clamp(2rem,5vw,3.5rem); letter-spacing:-.04em; } h2 { margin-top:0; }
     .notice { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:12px 14px; border-radius:12px; margin:18px 0; }
     .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; } .card { background:white; border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:0 4px 18px #1720330b; }
@@ -19,18 +25,23 @@
 </head>
 <body>
 <main>
-  <header>
+  <nav class="topbar" aria-label="Primary navigation">
+    <a class="wordmark" href="#top">SMRITI AI</a>
+    <a class="add-report" href="#add-report"><span aria-hidden="true">+</span> Add report</a>
+  </nav>
+  <header id="top">
     <p class="muted">Patient-owned health memory · judge demo</p>
     <h1>Smriti AI</h1>
     <p>Turn a synthetic medical report into a reviewable health timeline and concise emergency-ready outputs.</p>
     <div class="notice"><strong>Demo safety:</strong> synthetic data only. This deployment does not accept real patient information, PDF/image PHI, or live clinical AI calls.</div>
   </header>
   <section class="grid">
-    <div class="card">
-      <h2>1. Add synthetic report</h2>
+    <div class="card" id="add-report">
+      <h2>1. Add a report</h2>
+      <p class="muted">Start building your health memory in seconds.</p>
       <label for="report">Report text</label>
       <textarea id="report">Synthetic report: diabetes, metformin 500 mg, and severe penicillin reaction.</textarea>
-      <button id="process">Process report</button>
+      <button id="process" class="add-report"><span aria-hidden="true">+</span> Add report</button>
       <div id="status" class="status"></div>
     </div>
     <div class="card">
