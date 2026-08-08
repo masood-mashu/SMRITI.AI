@@ -42,7 +42,9 @@ timeline, and generate Doctor Brief/Emergency/Language outputs.
 | Validation | Pydantic / FastAPI models | Validates upload metadata, query parameters, languages, and API payloads | `backend/app/main.py`, `backend/app/extractor.py` |
 | Agent orchestration | LangGraph | Runs Report Understanding → Memory and the on-demand output graphs | `backend/app/graph.py` |
 | Demo extraction | Deterministic fixture provider | Converts the sample report into known facts without an LLM call | `backend/app/extractor.py` |
+| Real extraction | Gemini AI Studio API key or Vertex AI | Extracts structured facts from uploaded reports | `backend/app/extractor.py` |
 | Demo generation | Deterministic stub output provider | Produces repeatable Doctor Brief, Emergency Card, and translation output without an LLM call | `backend/app/graph.py`, `backend/app/generation.py` |
+| Real generation | Gemini AI Studio API key or Vertex AI | Generates the Doctor Brief, Emergency Card, and translation | `backend/app/generation.py`, `backend/app/graph.py` |
 | Database | SQLite + SQLModel | Stores patients, reports, ingestion jobs, health facts, and contradictions | `backend/app/db.py`, `backend/app/models.py`, `backend/app/repositories.py` |
 | File storage | Local filesystem storage | Temporarily stores the uploaded synthetic report in Vercel `/tmp` | `backend/app/storage.py` |
 | Privacy | Regex PII scrubber | Removes basic email/phone patterns before persistence in demo mode | `backend/app/privacy.py` |
@@ -113,6 +115,7 @@ SMRITI_ENV=demo
 INGESTION_QUEUE_PROVIDER=sync
 EXTRACTION_PROVIDER=stub
 OUTPUT_PROVIDER=stub
+GEMINI_API_KEY=
 PII_PROVIDER=regex
 AUTH_ENABLED=false
 PHI_STRICT=false
@@ -129,7 +132,10 @@ What these settings mean:
 - `INGESTION_QUEUE_PROVIDER=sync` processes the report during the request, so
   no Cloud Tasks worker is needed.
 - `EXTRACTION_PROVIDER=stub` and `OUTPUT_PROVIDER=stub` keep the demo
-  deterministic and do not require Google credentials.
+  deterministic and do not require Google credentials. Set both to `gemini`
+  and provide `GEMINI_API_KEY` to enable real Gemini calls.
+- `GEMINI_API_KEY` is server-side only. Never add it to frontend code or expose
+  it through a public environment variable.
 - `PII_PROVIDER=regex` uses the local deterministic scrubber.
 - `DATABASE_URL` and `LOCAL_STORAGE_DIR` point to temporary Vercel storage.
 - `AUTH_ENABLED=false` keeps the judge flow login-free.

@@ -152,6 +152,8 @@ def process_ingestion_job(job_id: UUID) -> None:
             update_ingestion_job(session, job_id, status="succeeded", report_id=UUID(result["report_id"]))
     except (ProviderConfigurationError, ExtractionError, StorageError, RuntimeError) as exc:
         _fail_job(job_id, str(exc))
+    except Exception as exc:
+        _fail_job(job_id, f"Ingestion failed: {type(exc).__name__}")
 
 
 def _fail_job(job_id: UUID, error: str) -> None:

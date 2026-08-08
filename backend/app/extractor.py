@@ -109,7 +109,7 @@ class GeminiExtractorStub:
 
 
 class VertexGeminiExtractor:
-    """Gemini multimodal extractor using the Google Gen AI Vertex client."""
+    """Gemini multimodal extractor using AI Studio or Vertex AI."""
 
     def __init__(
         self,
@@ -122,6 +122,7 @@ class VertexGeminiExtractor:
         self.project = project or os.getenv("GOOGLE_CLOUD_PROJECT")
         self.location = location or os.getenv("GOOGLE_CLOUD_LOCATION", "global")
         self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.1-pro")
+        self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         self._client = client
 
     @property
@@ -129,13 +130,14 @@ class VertexGeminiExtractor:
         if self._client is None:
             from google import genai
 
-            if not self.project:
-                raise ProviderConfigurationError("GOOGLE_CLOUD_PROJECT is required for Vertex Gemini")
-            self._client = genai.Client(
-                vertexai=True,
-                project=self.project,
-                location=self.location,
-            )
+            if self.api_key:
+                self._client = genai.Client(api_key=self.api_key)
+            else:
+                if not self.project:
+                    raise ProviderConfigurationError(
+                        "GEMINI_API_KEY or GOOGLE_CLOUD_PROJECT is required for Gemini"
+                    )
+                self._client = genai.Client(vertexai=True, project=self.project, location=self.location)
         return self._client
 
     def extract(self, *, filename: str, content_type: str, content: bytes) -> ExtractionResult:
@@ -206,7 +208,7 @@ treatment, or infer missing information. Return JSON with this exact shape:
 def get_extractor(*, use_fixture: bool) -> ReportExtractor:
     if use_fixture:
         return FixtureExtractor()
-    if os.getenv("EXTRACTION_PROVIDER", "stub").lower() == "vertex":
+    if os.getenv("EXTRACTION_PROVIDER", "stub").lower() in {"gemini", "ai_studio", "vertex"}:
         return VertexGeminiExtractor()
     raise ProviderConfigurationError(
         "Real report extraction is not configured; set EXTRACTION_PROVIDER=vertex or use fixture mode in development"

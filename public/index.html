@@ -257,7 +257,7 @@
       const patientId = localStorage.getItem(patientKey) || crypto.randomUUID();
       localStorage.setItem(patientKey, patientId);
       const authScope = "openid profile email read:memory write:reports generate:outputs delete:memory";
-      const state = { facts: [], contradictions: [], accessToken: null, authRequired: false, authClient: null, authConfig: null };
+      const state = { facts: [], contradictions: [], accessToken: null, authRequired: false, authClient: null, authConfig: null, useFixture: true };
       const $ = (selector) => document.querySelector(selector);
       const api = (path) => `/api${path}`;
       const query = (extra = "") => `patient_id=${encodeURIComponent(patientId)}${extra ? `&${extra}` : ""}`;
@@ -289,7 +289,13 @@
         const text = await response.text();
         let data = {};
         try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { detail: text }; }
-        if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
+        if (!response.ok) {
+          const detail = data.detail || `Request failed (${response.status})`;
+          if (response.status >= 500) {
+            throw new Error(`The backend could not complete this action. Check the Vercel function logs and database schema, then try again. (${detail})`);
+          }
+          throw new Error(detail);
+        }
         return data;
       }
 
@@ -342,13 +348,14 @@
         });
       }
 
-      async function loadTimeline(silent = false) {
+      async function loadTimeline(silent = false, sourceButton = null) {
         if (state.authRequired && !state.accessToken) {
           $("#sync-label").textContent = "Sign in to view your private memory";
           $("#timeline-list").innerHTML = '<div class="empty"><strong>Your memory is private</strong><span>Sign in to load your saved health history.</span></div>';
           return;
         }
         if (!silent) $("#sync-label").innerHTML = '<span class="loading"><span class="spinner"></span> Updating memory…</span>';
+        if (!silent && sourceButton) setButtonLoading(sourceButton, true, "Refreshing");
         try {
           const data = await request(`/timeline?${query()}`);
           state.facts = data.facts || [];
@@ -358,6 +365,8 @@
         } catch (error) {
           $("#sync-label").textContent = "Unable to load memory";
           if (!silent) showToast(error.message, true);
+        } finally {
+          if (!silent && sourceButton) setButtonLoading(sourceButton, false);
         }
       }
 
@@ -384,7 +393,10 @@
           const form = new FormData();
           form.append("file", file);
           form.append("source_type", $("#source-type").value);
-          const result = await request(`/reports?${query("fixture=true")}`, { method: "POST", body: form });
+          const result = await request(`/reports?${query(`fixture=${state.useFixture}`)}`, { method: "POST", body: form });
+          if (result.job_status === "failed") {
+            throw new Error(result.job_error || "The report could not be processed.");
+          }
           await loadTimeline(true);
           closeModal();
           showToast(`Report added · ${result.job_status || "memory updated"}`);
@@ -453,6 +465,8 @@
 
       async function setupAuth() {
         const config = await request("/auth/config");
+        const runtime = await request("/runtime/config");
+        state.useFixture = runtime.extraction_provider === "stub";
         state.authRequired = Boolean(config.enabled);
         state.authConfig = config;
         updateAuthButton();
@@ -489,8 +503,8 @@
       $("#open-report").addEventListener("click", openModal);
       $("#close-report").addEventListener("click", closeModal);
       $("#submit-report").addEventListener("click", submitReport);
-      $("#refresh-memory").addEventListener("click", () => loadTimeline());
-      $("#refresh-top").addEventListener("click", () => loadTimeline());
+      $("#refresh-memory").addEventListener("click", (event) => loadTimeline(false, event.currentTarget));
+      $("#refresh-top").addEventListener("click", (event) => loadTimeline(false, event.currentTarget));
       $("#report-modal").addEventListener("click", (event) => { if (event.target.id === "report-modal") closeModal(); });
       document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeModal(); });
       document.querySelectorAll("[data-output]").forEach((button) => button.addEventListener("click", () => generateOutput(button.dataset.output, button)));

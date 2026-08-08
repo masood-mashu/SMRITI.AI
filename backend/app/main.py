@@ -11,6 +11,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Quer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 
 from .db import check_database, init_db, session_scope
 from .config import Settings, validate_production_settings
@@ -272,6 +273,16 @@ def auth_config() -> dict[str, str | bool | None]:
     }
 
 
+@app.get("/runtime/config")
+def runtime_config() -> dict[str, str | bool]:
+    """Expose non-secret provider flags needed by the static frontend."""
+    return {
+        "demo_mode": os.getenv("SMRITI_DEMO_MODE", "false").lower() in {"1", "true", "yes", "on"},
+        "extraction_provider": os.getenv("EXTRACTION_PROVIDER", "stub").lower(),
+        "output_provider": os.getenv("OUTPUT_PROVIDER", "stub").lower(),
+    }
+
+
 @app.get("/metrics", dependencies=[Depends(require_security)])
 def metrics() -> PlainTextResponse:
     return PlainTextResponse(prometheus_metrics(), media_type="text/plain; version=0.0.4")
@@ -346,7 +357,8 @@ async def upload_report(
 ) -> dict:
     environment = os.getenv("SMRITI_ENV", "development").lower()
     demo_mode = os.getenv("SMRITI_DEMO_MODE", "false").lower() in {"1", "true", "yes", "on"}
-    if demo_mode and not fixture:
+    extraction_provider = os.getenv("EXTRACTION_PROVIDER", "stub").lower()
+    if demo_mode and not fixture and extraction_provider in {"stub", "fixture"}:
         raise HTTPException(status_code=400, detail="Demo mode accepts synthetic fixture reports only")
     if fixture and environment not in {"development", "test", "demo"} and not demo_mode:
         raise HTTPException(status_code=400, detail="fixture mode is available only in development and test environments")
@@ -379,20 +391,31 @@ async def upload_report(
         )
     except StorageError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    with session_scope() as session:
-        job = create_ingestion_job(
-            session,
-            patient_id=UUID(resolved_patient_id),
-            source_type=source_type,
-            file_url=file_url,
-            filename=file.filename or "upload",
-            content_type=file.content_type or "application/octet-stream",
-            use_fixture=fixture,
-            pii_redactions=scrubbed.redactions,
-            pii_provider=scrubbed.provider,
-        )
+    try:
+        with session_scope() as session:
+            job = create_ingestion_job(
+                session,
+                patient_id=UUID(resolved_patient_id),
+                source_type=source_type,
+                file_url=file_url,
+                filename=file.filename or "upload",
+                content_type=file.content_type or "application/octet-stream",
+                use_fixture=fixture,
+                pii_redactions=scrubbed.redactions,
+                pii_provider=scrubbed.provider,
+            )
+    except SQLAlchemyError as exc:
+        try:
+            storage.delete(file_url)
+        except StorageError:
+            pass
+        raise HTTPException(
+            status_code=503,
+            detail="Database schema or connection is unavailable. Run database/schema.sql in Neon and redeploy.",
+        ) from exc
     job_id = job.job_id
     job_status = "pending"
+    job_error = None
     try:
         enqueue_ingestion_job(job_id)
         if queue_config().provider == "inline":
@@ -406,6 +429,7 @@ async def upload_report(
                     patient_id=UUID(resolved_patient_id),
                 )
                 job_status = completed_job.status if completed_job else "failed"
+                job_error = completed_job.error if completed_job else None
     except QueueError as exc:
         with session_scope() as session:
             update_ingestion_job(session, job_id, status="failed", error=str(exc))
@@ -414,11 +438,14 @@ async def upload_report(
         except StorageError:
             pass
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Report ingestion failed: {type(exc).__name__}") from exc
     return {
         "status": "accepted",
         "job_id": str(job_id),
         "patient_id": resolved_patient_id,
         "job_status": job_status,
+        "job_error": job_error,
         "filename": file.filename or "upload",
     }
 

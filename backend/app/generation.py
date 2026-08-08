@@ -38,6 +38,7 @@ class VertexTextGenerator:
         self.model = model
         self.project = project or os.getenv("GOOGLE_CLOUD_PROJECT")
         self.location = location or os.getenv("GOOGLE_CLOUD_LOCATION", "global")
+        self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         self._client = client
 
     @property
@@ -45,13 +46,14 @@ class VertexTextGenerator:
         if self._client is None:
             from google import genai
 
-            if not self.project:
-                raise GenerationError("GOOGLE_CLOUD_PROJECT is required for Vertex output generation")
-            self._client = genai.Client(
-                vertexai=True,
-                project=self.project,
-                location=self.location,
-            )
+            if self.api_key:
+                self._client = genai.Client(api_key=self.api_key)
+            else:
+                if not self.project:
+                    raise GenerationError(
+                        "GEMINI_API_KEY or GOOGLE_CLOUD_PROJECT is required for Gemini output generation"
+                    )
+                self._client = genai.Client(vertexai=True, project=self.project, location=self.location)
         return self._client
 
     def generate(self, *, prompt: str) -> GenerationResult:
@@ -124,6 +126,6 @@ class VertexTextGenerator:
 
 
 def get_vertex_generator(*, model_env: str, default_model: str) -> VertexTextGenerator | None:
-    if os.getenv("OUTPUT_PROVIDER", "stub").lower() != "vertex":
+    if os.getenv("OUTPUT_PROVIDER", "stub").lower() not in {"gemini", "ai_studio", "vertex"}:
         return None
     return VertexTextGenerator(model=os.getenv(model_env, default_model))
