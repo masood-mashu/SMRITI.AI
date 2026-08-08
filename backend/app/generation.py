@@ -7,6 +7,8 @@ import random
 from collections.abc import Iterator
 from typing import Any, Protocol
 
+from .grok import GrokClient, GrokRequestError
+
 
 class GenerationError(RuntimeError):
     """Raised when an output provider cannot complete a generation request."""
@@ -125,7 +127,34 @@ class VertexTextGenerator:
                 raise GenerationError(f"Vertex streaming failed: {exc}") from exc
 
 
+class GrokTextGenerator:
+    """Text generator using the xAI chat completions API."""
+
+    def __init__(self, *, model: str | None = None, client: GrokClient | None = None) -> None:
+        self.client = client or GrokClient(model=model)
+
+    def generate(self, *, prompt: str) -> GenerationResult:
+        try:
+            text = self.client.complete(
+                messages=[
+                    {"role": "system", "content": "You are a careful health-memory assistant. Do not diagnose or recommend treatment."},
+                    {"role": "user", "content": prompt},
+                ]
+            )
+        except GrokRequestError as exc:
+            raise GenerationError(str(exc)) from exc
+        return GenerationResult(text=text, provider="grok")
+
+    def stream(self, *, prompt: str):
+        # The graph supports streaming, but the static frontend uses the
+        # non-streaming endpoints. Keep this method contract-safe for callers.
+        yield self.generate(prompt=prompt).text
+
+
 def get_vertex_generator(*, model_env: str, default_model: str) -> VertexTextGenerator | None:
-    if os.getenv("OUTPUT_PROVIDER", "stub").lower() not in {"gemini", "ai_studio", "vertex"}:
+    provider = os.getenv("OUTPUT_PROVIDER", "stub").lower()
+    if provider in {"grok", "xai"}:
+        return GrokTextGenerator(model=os.getenv("GROK_MODEL", default_model))
+    if provider not in {"gemini", "ai_studio", "vertex"}:
         return None
     return VertexTextGenerator(model=os.getenv(model_env, default_model))

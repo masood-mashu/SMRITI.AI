@@ -9,9 +9,12 @@ from datetime import date
 import os
 import time
 import random
+import json
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field, ValidationError
+
+from .grok import GrokClient, GrokRequestError
 
 
 @dataclass(frozen=True)
@@ -205,13 +208,51 @@ treatment, or infer missing information. Return JSON with this exact shape:
         )
 
 
+class GrokExtractor:
+    """Text report extractor using the xAI chat completions API."""
+
+    def __init__(self, *, client: GrokClient | None = None) -> None:
+        self.client = client or GrokClient()
+
+    def extract(self, *, filename: str, content_type: str, content: bytes) -> ExtractionResult:
+        if not content_type.startswith("text/"):
+            raise ExtractionError("Grok extraction currently supports text reports only")
+        prompt = """Extract only facts explicitly present in this medical report. Do not diagnose,
+recommend treatment, or infer missing information. Return JSON with this exact shape:
+{"facts":[{"fact_type":"condition|medication|allergy|lab_value|procedure|vaccination",
+"fact_key":"normalized name","fact_value":"value","unit":null,
+"status":"active|resolved|discontinued","is_emergency_relevant":false,
+"effective_date":"YYYY-MM-DD","confidence":0.0}],"explanation":"plain-language explanation"}
+"""
+        try:
+            raw = self.client.complete(
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": content.decode("utf-8", errors="replace")},
+                ],
+                json_mode=True,
+            )
+            payload = ExtractionPayload.model_validate_json(raw)
+        except GrokRequestError as exc:
+            raise ExtractionError(str(exc)) from exc
+        except (ValidationError, ValueError, json.JSONDecodeError) as exc:
+            raise ExtractionError(f"Grok returned invalid extraction JSON: {exc}") from exc
+        return ExtractionResult(
+            facts=[fact.model_dump() for fact in payload.facts],
+            explanation=payload.explanation,
+            provider="grok",
+        )
+
+
 def get_extractor(*, use_fixture: bool) -> ReportExtractor:
     if use_fixture:
         return FixtureExtractor()
     if os.getenv("EXTRACTION_PROVIDER", "stub").lower() in {"gemini", "ai_studio", "vertex"}:
         return VertexGeminiExtractor()
+    if os.getenv("EXTRACTION_PROVIDER", "stub").lower() in {"grok", "xai"}:
+        return GrokExtractor()
     raise ProviderConfigurationError(
-        "Real report extraction is not configured; set EXTRACTION_PROVIDER=gemini or vertex, or use fixture mode in development"
+        "Real report extraction is not configured; set EXTRACTION_PROVIDER=gemini, grok, or vertex, or use fixture mode in development"
     )
 
 

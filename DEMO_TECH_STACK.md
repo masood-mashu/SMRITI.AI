@@ -42,13 +42,13 @@ timeline, and generate Doctor Brief/Emergency/Language outputs.
 | Validation | Pydantic / FastAPI models | Validates upload metadata, query parameters, languages, and API payloads | `backend/app/main.py`, `backend/app/extractor.py` |
 | Agent orchestration | LangGraph | Runs Report Understanding → Memory and the on-demand output graphs | `backend/app/graph.py` |
 | Demo extraction | Deterministic fixture provider | Converts the sample report into known facts without an LLM call | `backend/app/extractor.py` |
-| Real extraction | Gemini AI Studio API key or Vertex AI | Extracts structured facts from uploaded reports | `backend/app/extractor.py` |
+| Real extraction | Gemini AI Studio, Grok xAI API, or Vertex AI | Extracts structured facts from uploaded reports | `backend/app/extractor.py`, `backend/app/grok.py` |
 | Demo generation | Deterministic stub output provider | Produces repeatable Doctor Brief, Emergency Card, and translation output without an LLM call | `backend/app/graph.py`, `backend/app/generation.py` |
-| Real generation | Gemini AI Studio API key or Vertex AI | Generates the Doctor Brief, Emergency Card, and translation | `backend/app/generation.py`, `backend/app/graph.py` |
-| Database | SQLite + SQLModel | Stores patients, reports, ingestion jobs, health facts, and contradictions | `backend/app/db.py`, `backend/app/models.py`, `backend/app/repositories.py` |
-| File storage | Local filesystem storage | Temporarily stores the uploaded synthetic report in Vercel `/tmp` | `backend/app/storage.py` |
+| Real generation | Gemini AI Studio, Grok xAI API, or Vertex AI | Generates the Doctor Brief, Emergency Card, and translation | `backend/app/generation.py`, `backend/app/grok.py`, `backend/app/graph.py` |
+| Database | Neon PostgreSQL + SQLModel | Stores patients, reports, ingestion jobs, health facts, and contradictions | `database/schema.sql`, `backend/app/db.py`, `backend/app/models.py`, `backend/app/repositories.py` |
+| File storage | Local filesystem or GCS | Local mode temporarily stores files in Vercel `/tmp`; GCS is the durable option | `backend/app/storage.py` |
 | Privacy | Regex PII scrubber | Removes basic email/phone patterns before persistence in demo mode | `backend/app/privacy.py` |
-| Authentication | Disabled demo mode | Uses a browser-generated demo patient UUID; no login is needed for the judge flow | `backend/app/security.py`, `public/index.html` |
+| Authentication | Auth0 OIDC or disabled demo mode | Auth0 maps stable OIDC subjects to patient history; demo mode uses a browser-generated UUID | `backend/app/security.py`, `public/index.html` |
 | Dependencies | Pinned Python packages | Installs the FastAPI, SQLModel, LangGraph, multipart upload, and security runtime | `requirements.txt` |
 
 ## 3. Files required for Vercel
@@ -116,6 +116,8 @@ INGESTION_QUEUE_PROVIDER=sync
 EXTRACTION_PROVIDER=stub
 OUTPUT_PROVIDER=stub
 GEMINI_API_KEY=
+XAI_API_KEY=
+GROK_MODEL=grok-4.5
 PII_PROVIDER=regex
 AUTH_ENABLED=false
 PHI_STRICT=false
@@ -133,7 +135,9 @@ What these settings mean:
   no Cloud Tasks worker is needed.
 - `EXTRACTION_PROVIDER=stub` and `OUTPUT_PROVIDER=stub` keep the demo
   deterministic and do not require Google credentials. Set both to `gemini`
-  and provide `GEMINI_API_KEY` to enable real Gemini calls.
+  and provide `GEMINI_API_KEY` to enable real Gemini calls. Use
+  `EXTRACTION_PROVIDER=grok` and `OUTPUT_PROVIDER=grok` with `XAI_API_KEY` to
+  enable Grok calls.
 - `GEMINI_API_KEY` is server-side only. Never add it to frontend code or expose
   it through a public environment variable.
 - `PII_PROVIDER=regex` uses the local deterministic scrubber.

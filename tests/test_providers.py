@@ -6,11 +6,13 @@ from backend.app.extractor import (
     GeminiExtractorStub,
     ProviderConfigurationError,
     VertexGeminiExtractor,
+    GrokExtractor,
     get_extractor,
 )
 from backend.app.privacy import GemmaPiiScrubber, PrivacyPolicyError, RegexPiiScrubber, VertexGemmaPiiScrubber
 from backend.app.generation import GenerationError, VertexTextGenerator, get_vertex_generator
 from backend.app.config import validate_production_settings
+from backend.app.grok import GrokClient
 
 
 def test_fixture_and_gemini_provider_contracts() -> None:
@@ -35,6 +37,28 @@ def test_gemini_provider_selection_is_server_side(monkeypatch) -> None:
     monkeypatch.setenv("OUTPUT_PROVIDER", "gemini")
     assert isinstance(get_extractor(use_fixture=False), VertexGeminiExtractor)
     assert get_vertex_generator(model_env="DOCTOR_BRIEF_MODEL", default_model="test-model") is not None
+
+
+def test_grok_extractor_parses_structured_response() -> None:
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {"choices": [{"message": {"content": '{"facts": [], "explanation": "ok"}'}}]}
+
+    class FakeSession:
+        def post(self, *args, **kwargs):
+            assert kwargs["headers"]["Authorization"] == "Bearer test-key"
+            assert kwargs["json"]["response_format"] == {"type": "json_object"}
+            return FakeResponse()
+
+    result = GrokExtractor(client=GrokClient(api_key="test-key", session=FakeSession())).extract(
+        filename="report.txt",
+        content_type="text/plain",
+        content=b"Synthetic report",
+    )
+    assert result.provider == "grok"
+    assert result.facts == []
 
 
 def test_gemma_scrubber_uses_safe_text_fallback() -> None:
