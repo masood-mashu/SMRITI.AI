@@ -8,11 +8,13 @@ from backend.app.extractor import (
     VertexGeminiExtractor,
     GrokExtractor,
     get_extractor,
+    NvidiaExtractor,
 )
 from backend.app.privacy import GemmaPiiScrubber, PrivacyPolicyError, RegexPiiScrubber, VertexGemmaPiiScrubber
 from backend.app.generation import GenerationError, VertexTextGenerator, get_vertex_generator
 from backend.app.config import validate_production_settings
 from backend.app.grok import GrokClient
+from backend.app.nvidia import NvidiaClient
 
 
 def test_fixture_and_gemini_provider_contracts() -> None:
@@ -58,6 +60,28 @@ def test_grok_extractor_parses_structured_response() -> None:
         content=b"Synthetic report",
     )
     assert result.provider == "grok"
+    assert result.facts == []
+
+
+def test_nvidia_extractor_parses_structured_response() -> None:
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {"choices": [{"message": {"content": '{"facts": [], "explanation": "ok"}'}}]}
+
+    class FakeSession:
+        def post(self, *args, **kwargs):
+            assert kwargs["headers"]["Authorization"] == "Bearer test-key"
+            assert kwargs["json"]["model"] == "openai/gpt-oss-20b"
+            return FakeResponse()
+
+    result = NvidiaExtractor(client=NvidiaClient(api_key="test-key", session=FakeSession())).extract(
+        filename="report.txt",
+        content_type="text/plain",
+        content=b"Synthetic report",
+    )
+    assert result.provider == "nvidia"
     assert result.facts == []
 
 

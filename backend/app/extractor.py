@@ -15,6 +15,7 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, Field, ValidationError
 
 from .grok import GrokClient, GrokRequestError
+from .nvidia import NvidiaClient, NvidiaRequestError
 
 
 @dataclass(frozen=True)
@@ -244,6 +245,42 @@ recommend treatment, or infer missing information. Return JSON with this exact s
         )
 
 
+class NvidiaExtractor:
+    """Text report extractor using an NVIDIA hosted NIM endpoint."""
+
+    def __init__(self, *, client: NvidiaClient | None = None) -> None:
+        self.client = client or NvidiaClient()
+
+    def extract(self, *, filename: str, content_type: str, content: bytes) -> ExtractionResult:
+        if not content_type.startswith("text/"):
+            raise ExtractionError("NVIDIA extraction currently supports text reports only")
+        prompt = """Extract only facts explicitly present in this medical report. Do not diagnose,
+recommend treatment, or infer missing information. Return JSON with this exact shape:
+{"facts":[{"fact_type":"condition|medication|allergy|lab_value|procedure|vaccination",
+"fact_key":"normalized name","fact_value":"value","unit":null,
+"status":"active|resolved|discontinued","is_emergency_relevant":false,
+"effective_date":"YYYY-MM-DD","confidence":0.0}],"explanation":"plain-language explanation"}
+"""
+        try:
+            raw = self.client.complete(
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": content.decode("utf-8", errors="replace")},
+                ],
+                json_mode=True,
+            )
+            payload = ExtractionPayload.model_validate_json(raw)
+        except NvidiaRequestError as exc:
+            raise ExtractionError(str(exc)) from exc
+        except (ValidationError, ValueError) as exc:
+            raise ExtractionError(f"NVIDIA returned invalid extraction JSON: {exc}") from exc
+        return ExtractionResult(
+            facts=[fact.model_dump() for fact in payload.facts],
+            explanation=payload.explanation,
+            provider="nvidia",
+        )
+
+
 def get_extractor(*, use_fixture: bool) -> ReportExtractor:
     if use_fixture:
         return FixtureExtractor()
@@ -251,8 +288,10 @@ def get_extractor(*, use_fixture: bool) -> ReportExtractor:
         return VertexGeminiExtractor()
     if os.getenv("EXTRACTION_PROVIDER", "stub").lower() in {"grok", "xai"}:
         return GrokExtractor()
+    if os.getenv("EXTRACTION_PROVIDER", "stub").lower() in {"nvidia", "nim"}:
+        return NvidiaExtractor()
     raise ProviderConfigurationError(
-        "Real report extraction is not configured; set EXTRACTION_PROVIDER=gemini, grok, or vertex, or use fixture mode in development"
+        "Real report extraction is not configured; set EXTRACTION_PROVIDER=gemini, grok, nvidia, or vertex, or use fixture mode in development"
     )
 
 

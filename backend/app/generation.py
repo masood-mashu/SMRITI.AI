@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from typing import Any, Protocol
 
 from .grok import GrokClient, GrokRequestError
+from .nvidia import NvidiaClient, NvidiaRequestError
 
 
 class GenerationError(RuntimeError):
@@ -151,10 +152,34 @@ class GrokTextGenerator:
         yield self.generate(prompt=prompt).text
 
 
+class NvidiaTextGenerator:
+    """Text generator using an NVIDIA hosted NIM endpoint."""
+
+    def __init__(self, *, model: str | None = None, client: NvidiaClient | None = None) -> None:
+        self.client = client or NvidiaClient(model=model)
+
+    def generate(self, *, prompt: str) -> GenerationResult:
+        try:
+            text = self.client.complete(
+                messages=[
+                    {"role": "system", "content": "You are a careful health-memory assistant. Do not diagnose or recommend treatment."},
+                    {"role": "user", "content": prompt},
+                ]
+            )
+        except NvidiaRequestError as exc:
+            raise GenerationError(str(exc)) from exc
+        return GenerationResult(text=text, provider="nvidia")
+
+    def stream(self, *, prompt: str):
+        yield self.generate(prompt=prompt).text
+
+
 def get_vertex_generator(*, model_env: str, default_model: str) -> VertexTextGenerator | None:
     provider = os.getenv("OUTPUT_PROVIDER", "stub").lower()
     if provider in {"grok", "xai"}:
         return GrokTextGenerator(model=os.getenv("GROK_MODEL", default_model))
+    if provider in {"nvidia", "nim"}:
+        return NvidiaTextGenerator(model=os.getenv("NVIDIA_MODEL", default_model))
     if provider not in {"gemini", "ai_studio", "vertex"}:
         return None
     return VertexTextGenerator(model=os.getenv(model_env, default_model))

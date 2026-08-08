@@ -42,9 +42,9 @@ timeline, and generate Doctor Brief/Emergency/Language outputs.
 | Validation | Pydantic / FastAPI models | Validates upload metadata, query parameters, languages, and API payloads | `backend/app/main.py`, `backend/app/extractor.py` |
 | Agent orchestration | LangGraph | Runs Report Understanding → Memory and the on-demand output graphs | `backend/app/graph.py` |
 | Demo extraction | Deterministic fixture provider | Converts the sample report into known facts without an LLM call | `backend/app/extractor.py` |
-| Real extraction | Gemini AI Studio, Grok xAI API, or Vertex AI | Extracts structured facts from uploaded reports | `backend/app/extractor.py`, `backend/app/grok.py` |
+| Real extraction | Gemini AI Studio, Grok xAI API, NVIDIA NIM, or Vertex AI | Extracts structured facts from uploaded reports | `backend/app/extractor.py`, `backend/app/grok.py`, `backend/app/nvidia.py` |
 | Demo generation | Deterministic stub output provider | Produces repeatable Doctor Brief, Emergency Card, and translation output without an LLM call | `backend/app/graph.py`, `backend/app/generation.py` |
-| Real generation | Gemini AI Studio, Grok xAI API, or Vertex AI | Generates the Doctor Brief, Emergency Card, and translation | `backend/app/generation.py`, `backend/app/grok.py`, `backend/app/graph.py` |
+| Real generation | Gemini AI Studio, Grok xAI API, NVIDIA NIM, or Vertex AI | Generates the Doctor Brief, Emergency Card, and translation | `backend/app/generation.py`, `backend/app/grok.py`, `backend/app/nvidia.py`, `backend/app/graph.py` |
 | Database | Neon PostgreSQL + SQLModel | Stores patients, reports, ingestion jobs, health facts, and contradictions | `database/schema.sql`, `backend/app/db.py`, `backend/app/models.py`, `backend/app/repositories.py` |
 | File storage | Local filesystem or GCS | Local mode temporarily stores files in Vercel `/tmp`; GCS is the durable option | `backend/app/storage.py` |
 | Privacy | Regex PII scrubber | Removes basic email/phone patterns before persistence in demo mode | `backend/app/privacy.py` |
@@ -138,6 +138,9 @@ What these settings mean:
   and provide `GEMINI_API_KEY` to enable real Gemini calls. Use
   `EXTRACTION_PROVIDER=grok` and `OUTPUT_PROVIDER=grok` with `XAI_API_KEY` to
   enable Grok calls.
+- Use `EXTRACTION_PROVIDER=nvidia` and `OUTPUT_PROVIDER=nvidia` with
+  `NVIDIA_API_KEY`, `NVIDIA_BASE_URL`, and `NVIDIA_MODEL` to enable NVIDIA NIM
+  calls.
 - `GEMINI_API_KEY` is server-side only. Never add it to frontend code or expose
   it through a public environment variable.
 - `PII_PROVIDER=regex` uses the local deterministic scrubber.

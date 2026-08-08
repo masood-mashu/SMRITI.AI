@@ -6,7 +6,7 @@ contradictions, and generates a Doctor Brief, Emergency Card, or translation.
 
 The repository is configured for a Vercel deployment with a vanilla frontend,
 FastAPI serverless API, Neon PostgreSQL persistence, Auth0 authentication, and
-optional Gemini, Grok, or Vertex model calls.
+optional Gemini, Grok, NVIDIA NIM, or Vertex model calls.
 
 ## Current architecture
 
@@ -18,7 +18,7 @@ Browser
                     └── backend/app/main.py
                           ├── Neon PostgreSQL
                           ├── Auth0 / OIDC
-                          ├── Gemini, Grok, or Vertex AI
+                          ├── Gemini, Grok, NVIDIA NIM, or Vertex AI
                           └── local or cloud storage provider
 ```
 
@@ -41,8 +41,8 @@ tokens are sent only to protected API routes.
    appends new facts, supersedes changed current facts, and records
    contradictions.
 8. The timeline reloads from PostgreSQL. Output buttons read current facts and
-   generate deterministic text or configured Gemini/Grok output depending on
-   provider configuration.
+   generate deterministic text or configured Gemini/Grok/NVIDIA output
+   depending on provider configuration.
 
 ## End-to-end audit status
 
@@ -76,7 +76,8 @@ storage, ingestion provider, and selected extractor to work together.
 - Database: Neon PostgreSQL with `psycopg`
 - Deployment: Vercel Python Functions and static hosting
 - Authentication: Auth0 OIDC with bearer-token validation
-- AI: deterministic demo providers, Gemini API key, Grok API key, or Vertex AI
+- AI: deterministic demo providers, Gemini API key, Grok API key, NVIDIA NIM
+  API key, or Vertex AI
 - Privacy: regex PII scrubbing for the demo; stricter providers can be enabled
 - Testing: Pytest backend suite and static frontend checks
 
@@ -166,7 +167,23 @@ GROK_MODEL=grok-4.5
 The Grok extractor currently supports text reports. PDF and image extraction
 continues to use Gemini/Vertex or must be converted to text first.
 
-### 5. Enable Auth0
+### 5. Enable NVIDIA NIM
+
+NVIDIA's hosted prototype endpoints are OpenAI-compatible. Configure the
+NVIDIA API key and the free prototype model shown in the NVIDIA catalog:
+
+```env
+NVIDIA_API_KEY=your_nvidia_key
+NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
+EXTRACTION_PROVIDER=nvidia
+OUTPUT_PROVIDER=nvidia
+NVIDIA_MODEL=openai/gpt-oss-20b
+```
+
+The NVIDIA extractor currently supports text reports. Free prototype access
+may have rate limits or model availability restrictions.
+
+### 6. Enable Auth0
 
 Create an Auth0 Single Page Application and API, then configure the callback,
 logout, and web-origin URLs to match the Vercel domain. Set:
@@ -201,9 +218,11 @@ information to the synthetic demo configuration.
   mode. Outside demo mode it also exposes a file picker for `.txt`, PDF, PNG,
   and JPEG reports, subject to the active privacy and signature settings.
 - The demo defaults to deterministic fixture extraction and deterministic
-  output. Real Gemini or Grok calls require the matching server-side API key
+  output. Real Gemini, Grok, or NVIDIA calls require the matching server-side API key
   and provider variables described above.
 - Grok extraction currently supports text reports only. Gemini/Vertex remain
+  the providers for multimodal report extraction.
+- NVIDIA extraction currently supports text reports only. Gemini/Vertex remain
   the providers for multimodal report extraction.
 - Regex PII scrubbing currently targets email addresses and phone numbers. It
   is not a complete medical-privacy redaction system.
