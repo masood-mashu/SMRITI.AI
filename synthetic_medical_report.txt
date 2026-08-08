@@ -1,0 +1,22 @@
+Synthetic Medical Report
+
+Patient: Demo Patient
+Report date: 2026-08-08
+
+Conditions:
+- Type 2 diabetes mellitus, currently active.
+
+Medications:
+- Metformin 500 mg, taken twice daily.
+
+Allergies:
+- Penicillin — severe allergic reaction.
+
+Laboratory results:
+- HbA1c: 7.2%.
+- Blood pressure: 128/82 mmHg.
+
+Procedures:
+- Routine diabetes follow-up completed.
+
+This report contains synthetic information for demonstration only.
