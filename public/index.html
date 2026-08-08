@@ -67,11 +67,12 @@
   const api = (path) => `/api${path}`;
   const qs = () => `patient_id=${encodeURIComponent(patientId)}`;
   const status = (text, error=false) => { const el=document.querySelector("#status"); el.textContent=text; el.className=`status${error?" error":""}`; };
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[character]));
   async function request(path, options={}) { const r=await fetch(api(path), options); const data=await r.json(); if(!r.ok) throw new Error(data.detail || `Request failed (${r.status})`); return data; }
   async function refresh() {
     try { const data=await request(`/timeline?${qs()}`); const box=document.querySelector("#timeline");
-      box.innerHTML=data.facts.length ? data.facts.map(f=>`<div class="fact"><strong>${f.fact_key}</strong><br>${f.fact_value}<br><small>confidence: ${f.confidence ?? "not provided"}</small></div>`).join("") : '<p class="muted">No facts recorded yet.</p>';
-      if(data.contradictions.length) box.innerHTML += data.contradictions.map(c=>`<div class="fact"><strong>Review needed</strong><br>${c.description}</div>`).join("");
+      box.innerHTML=data.facts.length ? data.facts.map(f=>`<div class="fact"><strong>${escapeHtml(f.fact_key)}</strong><br>${escapeHtml(f.fact_value)}<br><small>confidence: ${escapeHtml(f.confidence ?? "not provided")}</small></div>`).join("") : '<p class="muted">No facts recorded yet.</p>';
+      if(data.contradictions.length) box.innerHTML += data.contradictions.map(c=>`<div class="fact"><strong>Review needed</strong><br>${escapeHtml(c.description)}</div>`).join("");
     } catch(e) { status(e.message,true); }
   }
   document.querySelector("#process").onclick=async()=>{ try { status("Processing synthetic report…"); const text=document.querySelector("#report").value; const file=new File([text],"synthetic.txt",{type:"text/plain"}); const form=new FormData(); form.append("file",file); const data=await request(`/reports?${qs()}&fixture=true`,{method:"POST",body:form}); status(`Job ${data.job_status}. Timeline updated.`); await refresh(); } catch(e) { status(e.message,true); } };

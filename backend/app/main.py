@@ -65,6 +65,25 @@ if cors_origins:
         allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     )
 app.include_router(mcp_router)
+
+
+@app.middleware("http")
+async def normalize_vercel_path(request: Request, call_next):
+    """Accept both direct FastAPI paths and Vercel function-prefixed paths."""
+    path = request.scope.get("path", "")
+    for prefix in ("/api/index.py", "/api"):
+        if path == prefix:
+            request.scope["path"] = "/"
+            request.scope["raw_path"] = b"/"
+            break
+        if path.startswith(prefix + "/"):
+            normalized = path[len(prefix):] or "/"
+            request.scope["path"] = normalized
+            request.scope["raw_path"] = normalized.encode("utf-8")
+            break
+    return await call_next(request)
+
+
 DEFAULT_PATIENT_ID = UUID("00000000-0000-0000-0000-000000000001")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = {"application/pdf", "image/png", "image/jpeg", "text/plain"}
