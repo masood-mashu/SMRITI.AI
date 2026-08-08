@@ -116,6 +116,22 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     return response
 
 
+@app.exception_handler(Exception)
+async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Keep unexpected failures JSON-shaped and traceable in serverless logs."""
+    request_id = getattr(request.state, "request_id", None)
+    response = JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Unexpected server error. Check Vercel Runtime Logs.",
+            "request_id": request_id,
+        },
+    )
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
+    return response
+
+
 @app.middleware("http")
 async def request_observability(request: Request, call_next):
     request_id = str(uuid4())

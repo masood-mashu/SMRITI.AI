@@ -298,7 +298,8 @@
         if (!response.ok) {
           const detail = data.detail || `Request failed (${response.status})`;
           if (response.status >= 500) {
-            throw new Error(`The backend could not complete this action. Check the Vercel function logs and database schema, then try again. (${detail})`);
+            const requestId = response.headers.get("X-Request-ID") || data.request_id;
+            throw new Error(`The backend could not complete this action. Check the Vercel function logs and database schema, then try again. (${detail}${requestId ? ` Request ID: ${requestId}` : ""})`);
           }
           throw new Error(detail);
         }
