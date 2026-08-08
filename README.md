@@ -25,6 +25,49 @@ Browser
 The frontend never receives database credentials or AI API keys. Authentication
 tokens are sent only to protected API routes.
 
+## What happens when a report is added
+
+1. The browser creates a stable demo patient ID in local storage, or receives
+   the patient's identity from Auth0 when OIDC is enabled.
+2. The frontend sends the report as multipart form data to `POST /api/reports`.
+3. FastAPI validates the file type, size, and demo/production policy.
+4. The configured PII scrubber removes supported email addresses and phone
+   numbers before the report is stored or sent to an AI provider.
+5. The report is stored through the configured storage provider and an
+   ingestion job is created in PostgreSQL.
+6. Synchronous demo mode processes the job during the request. Production can
+   dispatch it to Cloud Tasks.
+7. The extractor returns structured facts. The memory graph stores the report,
+   appends new facts, supersedes changed current facts, and records
+   contradictions.
+8. The timeline reloads from PostgreSQL. Output buttons read current facts and
+   generate deterministic text or Gemini output depending on configuration.
+
+## End-to-end audit status
+
+The local repository audit completed on 2026-08-08:
+
+- 53 backend tests passed.
+- Ruff reported no issues for `backend`, `api`, and `tests`.
+- Python bytecode compilation passed for `backend` and `api`.
+- Frontend JavaScript syntax validation passed.
+- `git diff --check` passed.
+- `pip-audit` could not complete because this environment could not reach
+  PyPI; it did not report a vulnerability result.
+
+The deployed Vercel smoke check must still be run from an unrestricted browser:
+
+```text
+GET  https://smriti-ai-livid.vercel.app/api/health
+GET  https://smriti-ai-livid.vercel.app/api/health/ready
+POST https://smriti-ai-livid.vercel.app/api/reports
+```
+
+`/api/health` confirms that the Vercel function imports. `/api/health/ready`
+confirms that the Neon connection works. A successful report request requires
+the schema, storage, ingestion provider, and selected extractor to work
+together.
+
 ## Main technology stack
 
 - Frontend: semantic HTML, CSS, and browser JavaScript
@@ -133,6 +176,28 @@ stable OIDC subject to the user's patient history.
 
 The demo is an organizational aid, not a diagnosis. Do not upload real patient
 information to the synthetic demo configuration.
+
+## Current limitations
+
+- The shipped frontend is a text-report demo; it does not expose a file-picker
+  workflow. The API accepts `.txt`, PDF, PNG, and JPEG according to its active
+  privacy and signature settings.
+- The demo defaults to deterministic fixture extraction and deterministic
+  output. Real Gemini calls require `GEMINI_API_KEY` and the provider variables
+  described above.
+- Regex PII scrubbing currently targets email addresses and phone numbers. It
+  is not a complete medical-privacy redaction system.
+- Strict PHI mode currently allows text reports only because multimodal PII
+  redaction is not complete.
+- Contradiction review, deletion, MCP tools, and streaming routes exist in the
+  backend but are not all exposed as buttons in the shipped frontend.
+- Vercel local storage is temporary. Durable report files require encrypted
+  GCS configuration; Neon stores the structured memory and report references.
+- Non-production mode may store raw extracted JSON for debugging. Production
+  configuration disables raw extraction storage by default.
+- Demo mode uses browser-local patient identity and memory access is disabled
+  only when Auth0 is explicitly enabled. Keep `AUTH_ENABLED=false` only for
+  synthetic presentations.
 
 ## API routes
 
