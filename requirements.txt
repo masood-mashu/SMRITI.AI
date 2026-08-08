@@ -1,0 +1,7 @@
+fastapi==0.141.1
+sqlmodel==0.0.39
+langgraph==1.2.10
+python-multipart==0.0.32
+requests==2.34.2
+PyJWT[crypto]==2.13.0
+cryptography==50.0.0

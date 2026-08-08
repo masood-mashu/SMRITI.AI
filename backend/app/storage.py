@@ -135,9 +135,11 @@ def get_storage() -> FileStorage:
     provider = os.getenv("STORAGE_PROVIDER", "local").lower()
     if provider == "local":
         production = os.getenv("SMRITI_ENV", "development").lower() == "production"
+        demo_mode = os.getenv("SMRITI_DEMO_MODE", "false").lower() in {"1", "true", "yes", "on"}
         required = os.getenv("STORAGE_ENCRYPTION_REQUIRED", str(production)).lower() in {"1", "true", "yes", "on"}
+        root = os.getenv("LOCAL_STORAGE_DIR") or ("/tmp/smriti-demo-uploads" if demo_mode else ".data/uploads")
         return LocalFileStorage(
-            os.getenv("LOCAL_STORAGE_DIR", ".data/uploads"),
+            root,
             encryption_key=os.getenv("STORAGE_ENCRYPTION_KEY") or None,
             encryption_required=required,
             retention_days=int(os.getenv("STORAGE_RETENTION_DAYS", "0")),

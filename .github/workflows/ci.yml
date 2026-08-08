@@ -40,6 +40,8 @@ jobs:
         run: pip check
       - name: Apply and cycle database migrations
         run: alembic upgrade head && alembic check && alembic downgrade base && alembic upgrade head
+      - name: Confirm PostgreSQL-backed test target
+        run: python -c "import os; assert os.environ['DATABASE_URL'].startswith('postgresql+psycopg://')"
       - name: Dependency vulnerability audit
         run: pip-audit
       - name: Static security scan

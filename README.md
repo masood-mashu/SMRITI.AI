@@ -41,7 +41,38 @@ uvicorn backend.app.main:app --reload --port 8000
 streamlit run frontend/streamlit_app.py
 ```
 
+## Free judge demo on Vercel
+
+The repository also includes a zero-cost, synthetic-data-only Vercel path. It
+uses the FastAPI Python Function in `api/index.py`, the static judge UI in
+`public/index.html`, synchronous fixture ingestion, and temporary SQLite/local
+storage. It does not require Google Cloud, Redis, Cloud Tasks, Vertex, or
+external AI credentials. Configure these Vercel environment variables:
+
+```env
+SMRITI_DEMO_MODE=true
+SMRITI_ENV=demo
+INGESTION_QUEUE_PROVIDER=sync
+EXTRACTION_PROVIDER=stub
+OUTPUT_PROVIDER=stub
+PII_PROVIDER=regex
+AUTH_ENABLED=false
+PHI_STRICT=false
+STORAGE_PROVIDER=local
+LOCAL_STORAGE_DIR=/tmp/smriti-demo-uploads
+DATABASE_URL=sqlite:////tmp/smriti-demo.db
+RATE_LIMIT_BACKEND=memory
+```
+
+Deploy the repository as a Vercel project with the root directory unchanged.
+The public URL serves the demo UI; API calls use the `/api/*` rewrite. Use
+synthetic data only. Vercel temporary storage is not durable and this mode is
+not suitable for real patient data.
+
 Use the synthetic, no-PII sample at `samples/synthetic_medical_report.txt`.
+Until multimodal PII redaction is deployed and validated, strict PHI mode
+accepts only `.txt` files with `text/plain` content. PDF and image uploads are
+rejected in that mode; do not send real PHI through non-strict binary paths.
 
 For the production-shaped local stack, start Docker Desktop and run:
 
@@ -61,7 +92,8 @@ configuration instead, set `$env:SMRITI_ENV="production"` before starting.
 
 - `GET /health` and `GET /health/live` - liveness
 - `GET /health/ready` - database readiness
-- `POST /reports` - upload a report; use `fixture=true` only for development
+- `POST /reports` - upload a report; strict PHI mode currently supports
+  text-only uploads; use `fixture=true` only for development
 - `GET /ingestion-jobs/{id}` - retrieve ingestion status for an authorized patient
 - `GET /timeline` - current and superseded facts plus contradictions
 - `DELETE /patients/{id}` - erase authorized patient records and stored reports

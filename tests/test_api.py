@@ -193,6 +193,19 @@ def test_production_upload_checks_file_signature(monkeypatch) -> None:
         assert response.status_code == 415
 
 
+def test_strict_phi_mode_rejects_binary_uploads_until_multimodal_redaction_exists(monkeypatch) -> None:
+    monkeypatch.setenv("SMRITI_ENV", "development")
+    monkeypatch.setenv("PHI_STRICT", "true")
+    monkeypatch.setenv("RATE_LIMIT_BACKEND", "memory")
+    with TestClient(app) as client:
+        response = client.post(
+            f"/reports?patient_id={uuid4()}&fixture=true",
+            files={"file": ("report.pdf", b"%PDF-1.7", "application/pdf")},
+        )
+        assert response.status_code == 415
+        assert "text/plain" in response.json()["detail"]
+
+
 def test_translation_rejects_unsupported_language() -> None:
     with TestClient(app) as client:
         response = client.post("/translate?language=fr")

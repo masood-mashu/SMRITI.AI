@@ -36,8 +36,12 @@ class QueueConfig:
 
 def queue_config() -> QueueConfig:
     environment = os.getenv("SMRITI_ENV", "development").lower()
+    demo_mode = os.getenv("SMRITI_DEMO_MODE", "false").lower() in {"1", "true", "yes", "on"}
     return QueueConfig(
-        provider=os.getenv("INGESTION_QUEUE_PROVIDER", "cloud_tasks" if environment == "production" else "inline").lower(),
+        provider=os.getenv(
+            "INGESTION_QUEUE_PROVIDER",
+            "sync" if demo_mode or environment == "demo" else ("cloud_tasks" if environment == "production" else "inline"),
+        ).lower(),
         project=os.getenv("GCP_PROJECT") or os.getenv("GOOGLE_CLOUD_PROJECT"),
         location=os.getenv("INGESTION_QUEUE_LOCATION"),
         queue=os.getenv("INGESTION_QUEUE_NAME"),
@@ -100,7 +104,7 @@ def _enqueue_cloud_task(job_id: UUID, config: QueueConfig) -> None:
 
 def enqueue_ingestion_job(job_id: UUID) -> None:
     config = queue_config()
-    if config.provider == "inline":
+    if config.provider in {"inline", "sync"}:
         return
     if config.provider == "cloud_tasks":
         _enqueue_cloud_task(job_id, config)

@@ -28,7 +28,11 @@ class Settings:
     @classmethod
     def from_env(cls) -> "Settings":
         environment = os.getenv("SMRITI_ENV", "development").lower()
-        database_url = os.getenv("DATABASE_URL", "sqlite:///./smriti.db")
+        demo_mode = os.getenv("SMRITI_DEMO_MODE", "false").lower() in {"1", "true", "yes", "on"}
+        database_url = os.getenv(
+            "DATABASE_URL",
+            "sqlite:////tmp/smriti-demo.db" if demo_mode else "sqlite:///./smriti.db",
+        )
         auto_create_default = environment != "production" and database_url.startswith("sqlite")
         return cls(
             environment=environment,

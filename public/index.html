@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smriti AI — Synthetic Demo</title>
+  <style>
+    :root { color-scheme: light; --ink:#172033; --muted:#64748b; --brand:#2563eb; --soft:#eff6ff; --line:#dbe4f0; }
+    * { box-sizing:border-box; } body { margin:0; background:#f8fafc; color:var(--ink); font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
+    main { max-width:1080px; margin:auto; padding:32px 20px 64px; } header { margin-bottom:24px; }
+    h1 { margin:0 0 6px; font-size:clamp(2rem,5vw,3.5rem); letter-spacing:-.04em; } h2 { margin-top:0; }
+    .notice { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:12px 14px; border-radius:12px; margin:18px 0; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; } .card { background:white; border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:0 4px 18px #1720330b; }
+    label { display:block; font-weight:650; margin:12px 0 6px; } textarea, select { width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px; font:inherit; } textarea { min-height:150px; resize:vertical; }
+    button { border:0; border-radius:10px; background:var(--brand); color:white; padding:10px 15px; font-weight:700; cursor:pointer; margin:12px 8px 0 0; } button.secondary { background:#e2e8f0; color:var(--ink); }
+    pre { white-space:pre-wrap; background:var(--soft); padding:14px; border-radius:10px; min-height:60px; } .muted { color:var(--muted); } .facts { display:grid; gap:8px; } .fact { border-left:4px solid #60a5fa; padding:8px 12px; background:#f8fbff; }
+    .status { min-height:24px; color:var(--muted); } .error { color:#b91c1c; } @media (max-width:600px) { main { padding:22px 14px 40px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="muted">Patient-owned health memory · judge demo</p>
+    <h1>Smriti AI</h1>
+    <p>Turn a synthetic medical report into a reviewable health timeline and concise emergency-ready outputs.</p>
+    <div class="notice"><strong>Demo safety:</strong> synthetic data only. This deployment does not accept real patient information, PDF/image PHI, or live clinical AI calls.</div>
+  </header>
+  <section class="grid">
+    <div class="card">
+      <h2>1. Add synthetic report</h2>
+      <label for="report">Report text</label>
+      <textarea id="report">Synthetic report: diabetes, metformin 500 mg, and severe penicillin reaction.</textarea>
+      <button id="process">Process report</button>
+      <div id="status" class="status"></div>
+    </div>
+    <div class="card">
+      <h2>2. Health timeline</h2>
+      <button id="refresh" class="secondary">Refresh timeline</button>
+      <div id="timeline" class="facts"><p class="muted">No facts loaded yet.</p></div>
+    </div>
+  </section>
+  <section class="card" style="margin-top:18px">
+    <h2>3. Explain the memory</h2>
+    <button data-output="brief">Doctor Brief</button>
+    <button data-output="emergency">Emergency Card</button>
+    <label for="language">Language</label>
+    <select id="language"><option value="en">English</option><option value="hi">Hindi</option><option value="kn">Kannada</option></select>
+    <button data-output="translate">Translate</button>
+    <pre id="output">Choose an output after processing the synthetic report.</pre>
+  </section>
+</main>
+<script>
+  const patientKey = "smriti-demo-patient";
+  const patientId = localStorage.getItem(patientKey) || crypto.randomUUID();
+  localStorage.setItem(patientKey, patientId);
+  const api = (path) => `/api${path}`;
+  const qs = () => `patient_id=${encodeURIComponent(patientId)}`;
+  const status = (text, error=false) => { const el=document.querySelector("#status"); el.textContent=text; el.className=`status${error?" error":""}`; };
+  async function request(path, options={}) { const r=await fetch(api(path), options); const data=await r.json(); if(!r.ok) throw new Error(data.detail || `Request failed (${r.status})`); return data; }
+  async function refresh() {
+    try { const data=await request(`/timeline?${qs()}`); const box=document.querySelector("#timeline");
+      box.innerHTML=data.facts.length ? data.facts.map(f=>`<div class="fact"><strong>${f.fact_key}</strong><br>${f.fact_value}<br><small>confidence: ${f.confidence ?? "not provided"}</small></div>`).join("") : '<p class="muted">No facts recorded yet.</p>';
+      if(data.contradictions.length) box.innerHTML += data.contradictions.map(c=>`<div class="fact"><strong>Review needed</strong><br>${c.description}</div>`).join("");
+    } catch(e) { status(e.message,true); }
+  }
+  document.querySelector("#process").onclick=async()=>{ try { status("Processing synthetic report…"); const text=document.querySelector("#report").value; const file=new File([text],"synthetic.txt",{type:"text/plain"}); const form=new FormData(); form.append("file",file); const data=await request(`/reports?${qs()}&fixture=true`,{method:"POST",body:form}); status(`Job ${data.job_status}. Timeline updated.`); await refresh(); } catch(e) { status(e.message,true); } };
+  document.querySelector("#refresh").onclick=refresh;
+  document.querySelectorAll("[data-output]").forEach(button=>button.onclick=async()=>{ try { const kind=button.dataset.output; const path=kind==="translate"?`/translate?${qs()}&language=${document.querySelector("#language").value}`:`/${kind}?${qs()}`; const data=await request(path,{method:"POST"}); const graph=data.graph||{}; document.querySelector("#output").textContent=graph.doctor_brief||graph.emergency_card||graph.translation||"No output returned."; } catch(e) { document.querySelector("#output").textContent=e.message; } });
+</script>
+</body>
+</html>

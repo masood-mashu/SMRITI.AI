@@ -146,12 +146,22 @@ def persist_report_and_facts(
             confidence=payload_confidence,
         )
         if current is not None:
-            # Close the current row before inserting its replacement so the
-            # unique partial index is satisfied throughout the transaction.
+            # The partial unique index requires the old row to stop being
+            # current before inserting its replacement, while the
+            # self-referential FK requires the replacement to exist before the
+            # final link is written. A temporary self-link satisfies both
+            # immediate constraints; the transaction is atomic, so callers
+            # never observe this intermediate state.
+            current.superseded_by = current.fact_id
+            session.flush()
+            session.add(fact)
+            session.flush()
+        else:
+            session.add(fact)
+            session.flush()
+        if current is not None:
             current.superseded_by = fact.fact_id
             session.flush()
-        session.add(fact)
-        session.flush()
 
         if current is not None:
             contradiction = Contradiction(
@@ -217,9 +227,11 @@ def delete_patient_data(session: Session, patient_id: UUID) -> list[str] | None:
     facts = list(session.exec(select(HealthFact).where(HealthFact.patient_id == patient_id)))
     contradictions = list(session.exec(select(Contradiction).where(Contradiction.patient_id == patient_id)))
 
-    # Break self-referential fact links before deleting the fact rows.
+    # Break self-referential fact links before deleting the fact rows. Use a
+    # temporary self-link rather than NULL: multiple historical rows share a
+    # fact_key, so clearing all links would violate the partial unique index.
     for fact in facts:
-        fact.superseded_by = None
+        fact.superseded_by = fact.fact_id
         session.add(fact)
     session.flush()
     for contradiction in contradictions:
@@ -230,6 +242,10 @@ def delete_patient_data(session: Session, patient_id: UUID) -> list[str] | None:
         session.delete(job)
     for report in reports:
         session.delete(report)
+    # Flush child deletions before removing the patient. PostgreSQL enforces
+    # these foreign keys immediately and does not infer this order from the
+    # SQLModel classes because explicit relationships are not declared.
+    session.flush()
     session.delete(patient)
     session.flush()
     return [report.file_url for report in reports if report.file_url]

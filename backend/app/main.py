@@ -144,7 +144,10 @@ def resolve_patient_id(patient_id: UUID | None, request: Request | None = None) 
         return auth.patient_id
     if patient_id is not None:
         return enforce_patient_access(request, str(patient_id)) if request is not None else str(patient_id)
-    if os.getenv("SMRITI_ENV", "development").lower() not in {"development", "test"}:
+    if (
+        os.getenv("SMRITI_ENV", "development").lower() not in {"development", "test", "demo"}
+        and os.getenv("SMRITI_DEMO_MODE", "false").lower() not in {"1", "true", "yes", "on"}
+    ):
         raise HTTPException(status_code=400, detail="patient_id is required")
     return str(DEFAULT_PATIENT_ID)
 
@@ -166,6 +169,20 @@ def validate_upload(*, filename: str, content_type: str, content: bytes) -> None
         raise HTTPException(status_code=415, detail="Unsupported report type")
     if expected_types[suffix] != content_type:
         raise HTTPException(status_code=415, detail="Unsupported report type")
+    strict_phi = os.getenv(
+        "PHI_STRICT",
+        "true" if os.getenv("SMRITI_ENV", "development").lower() == "production" else "false",
+    ).lower() in {"1", "true", "yes", "on"}
+    demo_mode = os.getenv("SMRITI_DEMO_MODE", "false").lower() in {"1", "true", "yes", "on"}
+    if (demo_mode or strict_phi) and (suffix != ".txt" or content_type != "text/plain"):
+        raise HTTPException(
+            status_code=415,
+            detail=(
+                "Demo mode supports text/plain .txt synthetic reports only"
+                if demo_mode
+                else "Strict PHI mode currently supports text/plain .txt reports only; binary redaction is not available"
+            ),
+        )
     strict_signature = os.getenv(
         "UPLOAD_SIGNATURE_CHECK",
         "true" if os.getenv("SMRITI_ENV", "development").lower() == "production" else "false",
@@ -293,7 +310,10 @@ async def upload_report(
     fixture: bool = False,
 ) -> dict:
     environment = os.getenv("SMRITI_ENV", "development").lower()
-    if fixture and environment not in {"development", "test"}:
+    demo_mode = os.getenv("SMRITI_DEMO_MODE", "false").lower() in {"1", "true", "yes", "on"}
+    if demo_mode and not fixture:
+        raise HTTPException(status_code=400, detail="Demo mode accepts synthetic fixture reports only")
+    if fixture and environment not in {"development", "test", "demo"} and not demo_mode:
         raise HTTPException(status_code=400, detail="fixture mode is available only in development and test environments")
     content = await file.read()
     validate_upload(
@@ -337,10 +357,20 @@ async def upload_report(
             pii_provider=scrubbed.provider,
         )
     job_id = job.job_id
+    job_status = "pending"
     try:
         enqueue_ingestion_job(job_id)
         if queue_config().provider == "inline":
             background_tasks.add_task(process_ingestion_job, job_id)
+        elif queue_config().provider == "sync":
+            process_ingestion_job(job_id)
+            with session_scope() as session:
+                completed_job = get_ingestion_job(
+                    session,
+                    job_id=job_id,
+                    patient_id=UUID(resolved_patient_id),
+                )
+                job_status = completed_job.status if completed_job else "failed"
     except QueueError as exc:
         with session_scope() as session:
             update_ingestion_job(session, job_id, status="failed", error=str(exc))
@@ -353,7 +383,7 @@ async def upload_report(
         "status": "accepted",
         "job_id": str(job_id),
         "patient_id": resolved_patient_id,
-        "job_status": "pending",
+        "job_status": job_status,
         "filename": file.filename or "upload",
     }
 
