@@ -6,7 +6,7 @@ from time import time
 import pytest
 from cryptography.fernet import Fernet
 
-from backend.app.storage import LocalFileStorage, StorageError
+from backend.app.storage import LocalFileStorage, StorageError, get_storage
 
 
 def storage_root() -> Path:
@@ -38,6 +38,15 @@ def test_local_storage_deletes_stored_reference() -> None:
         assert list(tmp_path.iterdir()) == []
     finally:
         shutil.rmtree(tmp_path)
+
+
+def test_vercel_redirects_relative_local_storage_to_tmp(monkeypatch) -> None:
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("LOCAL_STORAGE_DIR", ".data/uploads")
+    monkeypatch.setenv("SMRITI_DEMO_MODE", "true")
+    storage = get_storage()
+    assert isinstance(storage, LocalFileStorage)
+    assert storage.root == Path("/tmp/smriti-demo-uploads")
 
 
 def test_production_storage_requires_encryption_key(monkeypatch) -> None:

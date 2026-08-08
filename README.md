@@ -266,6 +266,10 @@ Check Vercel Runtime Logs, then verify:
 The report endpoint now returns an actionable database or ingestion message
 instead of hiding the failure behind a generic response.
 
+If Vercel logs show `Read-only file system` for `.data/uploads`, redeploy the
+latest commit. Vercel deployments automatically redirect relative local storage
+paths to writable `/tmp/smriti-demo-uploads`.
+
 ## Local development
 
 ```powershell

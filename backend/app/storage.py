@@ -50,9 +50,12 @@ class LocalFileStorage:
     def store(self, *, filename: str, content: bytes, content_type: str) -> str:
         suffix = Path(filename).suffix.lower()
         key = f"{uuid4()}{suffix}"
-        self.root.mkdir(parents=True, exist_ok=True)
-        payload = self._fernet.encrypt(content) if self._fernet else content
-        (self.root / key).write_bytes(payload)
+        try:
+            self.root.mkdir(parents=True, exist_ok=True)
+            payload = self._fernet.encrypt(content) if self._fernet else content
+            (self.root / key).write_bytes(payload)
+        except OSError as exc:
+            raise StorageError("Local report storage is unavailable or read-only") from exc
         return f"local://{key}"
 
     def delete(self, reference: str) -> None:
@@ -137,7 +140,12 @@ def get_storage() -> FileStorage:
         production = os.getenv("SMRITI_ENV", "development").lower() == "production"
         demo_mode = os.getenv("SMRITI_DEMO_MODE", "false").lower() in {"1", "true", "yes", "on"}
         required = os.getenv("STORAGE_ENCRYPTION_REQUIRED", str(production)).lower() in {"1", "true", "yes", "on"}
-        root = os.getenv("LOCAL_STORAGE_DIR") or ("/tmp/smriti-demo-uploads" if demo_mode else ".data/uploads")
+        configured_root = os.getenv("LOCAL_STORAGE_DIR")
+        # Vercel's deployment filesystem is read-only. Relative paths such as
+        # .data/uploads must be redirected to its writable temporary volume.
+        if os.getenv("VERCEL", "").lower() in {"1", "true", "yes", "on"} and configured_root and not Path(configured_root).is_absolute():
+            configured_root = "/tmp/smriti-demo-uploads"
+        root = configured_root or ("/tmp/smriti-demo-uploads" if demo_mode else ".data/uploads")
         return LocalFileStorage(
             root,
             encryption_key=os.getenv("STORAGE_ENCRYPTION_KEY") or None,
