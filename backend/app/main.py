@@ -255,6 +255,8 @@ def liveness() -> dict[str, str]:
 def readiness() -> dict[str, str]:
     try:
         check_database()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Database unavailable") from exc
     return {"status": "ready"}

@@ -64,9 +64,9 @@ POST https://smriti-ai-livid.vercel.app/api/reports
 ```
 
 `/api/health` confirms that the Vercel function imports. `/api/health/ready`
-confirms that the Neon connection works. A successful report request requires
-the schema, storage, ingestion provider, and selected extractor to work
-together.
+now confirms both the Neon connection and the presence of all five required
+application tables. A successful report request still requires the schema,
+storage, ingestion provider, and selected extractor to work together.
 
 ## Main technology stack
 
@@ -179,9 +179,9 @@ information to the synthetic demo configuration.
 
 ## Current limitations
 
-- The shipped frontend is a text-report demo; it does not expose a file-picker
-  workflow. The API accepts `.txt`, PDF, PNG, and JPEG according to its active
-  privacy and signature settings.
+- The shipped frontend presents the prepared synthetic text report in demo
+  mode. Outside demo mode it also exposes a file picker for `.txt`, PDF, PNG,
+  and JPEG reports, subject to the active privacy and signature settings.
 - The demo defaults to deterministic fixture extraction and deterministic
   output. Real Gemini calls require `GEMINI_API_KEY` and the provider variables
   described above.
@@ -219,7 +219,8 @@ Check Vercel Runtime Logs, then verify:
 
 1. `DATABASE_URL` is present in the same Vercel environment as the deployment.
 2. `database/schema.sql` was executed in the Neon branch used by that URL.
-3. `GET /api/health/ready` returns `{"status":"ready"}`.
+3. `GET /api/health/ready` returns `{"status":"ready"}`. If tables are
+   missing, it now reports their names directly.
 4. `psycopg[binary]` is installed by the deployment.
 5. `GEMINI_API_KEY` and provider names are correct if real AI is enabled.
 

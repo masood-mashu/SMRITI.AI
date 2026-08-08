@@ -20,6 +20,33 @@ def test_plain_postgresql_url_uses_psycopg_driver() -> None:
     assert normalize_database_url("postgres://user:pass@host/db") == "postgresql+psycopg://user:pass@host/db"
 
 
+def test_readiness_reports_incomplete_application_schema(monkeypatch) -> None:
+    def incomplete_schema() -> bool:
+        raise RuntimeError("Database schema is incomplete; missing tables: reports")
+
+    monkeypatch.setattr("backend.app.main.check_database", incomplete_schema)
+    with TestClient(app) as client:
+        response = client.get("/health/ready")
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Database schema is incomplete; missing tables: reports"
+
+
+def test_runtime_config_exposes_provider_flags_without_secrets(monkeypatch) -> None:
+    monkeypatch.setenv("SMRITI_DEMO_MODE", "true")
+    monkeypatch.setenv("EXTRACTION_PROVIDER", "gemini")
+    monkeypatch.setenv("OUTPUT_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "must-not-leak")
+    with TestClient(app) as client:
+        response = client.get("/runtime/config")
+    assert response.status_code == 200
+    assert response.json() == {
+        "demo_mode": True,
+        "extraction_provider": "gemini",
+        "output_provider": "gemini",
+    }
+    assert "must-not-leak" not in response.text
+
+
 def test_fixture_upload_populates_timeline() -> None:
     patient_id = uuid4()
     with TestClient(app) as client:

@@ -109,6 +109,10 @@
     textarea, select { width: 100%; border: 1px solid #ccd9cc; border-radius: 12px; color: var(--ink); background: #fbfdf9; outline: none; }
     textarea:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(29,107,85,.12); }
     textarea { min-height: 145px; padding: 13px; resize: vertical; }
+    .file-picker { padding: 13px; border: 1px dashed #b9cdbb; border-radius: 12px; color: var(--muted); background: #fbfdf9; }
+    .file-picker input { display: block; width: 100%; margin-top: 8px; color: var(--ink); }
+    .file-picker small { display: block; margin-top: 6px; color: var(--muted); }
+    .file-picker.disabled { opacity: .58; }
     .modal select { min-height: 44px; padding: 0 12px; }
     .modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 19px; }
     .modal-foot small { color: var(--muted); }
@@ -243,6 +247,8 @@
       </div>
       <label for="source-type">Report type</label>
       <select id="source-type"><option value="other">Other</option><option value="lab_result">Lab result</option><option value="discharge_summary">Discharge summary</option><option value="prescription">Prescription</option></select>
+      <label for="report-file">Upload a report file</label>
+      <div class="file-picker" id="file-picker"><input id="report-file" type="file" accept=".txt,.pdf,.png,.jpg,.jpeg,text/plain,application/pdf,image/png,image/jpeg"><small id="file-help">Optional. Choose a file, or use the prepared synthetic text below.</small></div>
       <label for="report-text">Report text</label>
       <textarea id="report-text">Synthetic report: diabetes, metformin 500 mg, and severe penicillin reaction.</textarea>
       <div class="modal-foot"><small>Demo mode accepts synthetic text reports only.</small><button class="primary" id="submit-report" type="button"><span class="button-plus">+</span> Add to memory</button></div>
@@ -257,7 +263,7 @@
       const patientId = localStorage.getItem(patientKey) || crypto.randomUUID();
       localStorage.setItem(patientKey, patientId);
       const authScope = "openid profile email read:memory write:reports generate:outputs delete:memory";
-      const state = { facts: [], contradictions: [], accessToken: null, authRequired: false, authClient: null, authConfig: null, useFixture: true };
+      const state = { facts: [], contradictions: [], accessToken: null, authRequired: false, authClient: null, authConfig: null, useFixture: true, demoMode: true };
       const $ = (selector) => document.querySelector(selector);
       const api = (path) => `/api${path}`;
       const query = (extra = "") => `patient_id=${encodeURIComponent(patientId)}${extra ? `&${extra}` : ""}`;
@@ -380,16 +386,28 @@
         $("#report-status").textContent = "";
       }
 
+      function updateFilePicker() {
+        const picker = $("#file-picker");
+        const input = $("#report-file");
+        const help = $("#file-help");
+        input.disabled = state.demoMode;
+        picker.classList.toggle("disabled", state.demoMode);
+        help.textContent = state.demoMode
+          ? "Demo mode accepts the prepared synthetic text report only."
+          : "Optional. Choose a .txt, PDF, PNG, or JPEG report, or use the text field below.";
+      }
+
       async function submitReport() {
         const submit = $("#submit-report");
         const text = $("#report-text").value.trim();
+        const selectedFile = $("#report-file").files[0];
         const status = $("#report-status");
-        if (!text) { status.textContent = "Add some report text first."; status.className = "status error"; return; }
+        if (!text && !selectedFile) { status.textContent = "Add report text or choose a file first."; status.className = "status error"; return; }
         status.textContent = "Reading the synthetic report and updating memory…";
         status.className = "status";
         setButtonLoading(submit, true, "Adding report");
         try {
-          const file = new File([text], "synthetic.txt", { type: "text/plain" });
+          const file = selectedFile || new File([text], "synthetic.txt", { type: "text/plain" });
           const form = new FormData();
           form.append("file", file);
           form.append("source_type", $("#source-type").value);
@@ -467,6 +485,8 @@
         const config = await request("/auth/config");
         const runtime = await request("/runtime/config");
         state.useFixture = runtime.extraction_provider === "stub";
+        state.demoMode = Boolean(runtime.demo_mode);
+        updateFilePicker();
         state.authRequired = Boolean(config.enabled);
         state.authConfig = config;
         updateAuthButton();
@@ -508,6 +528,7 @@
       $("#report-modal").addEventListener("click", (event) => { if (event.target.id === "report-modal") closeModal(); });
       document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeModal(); });
       document.querySelectorAll("[data-output]").forEach((button) => button.addEventListener("click", () => generateOutput(button.dataset.output, button)));
+      updateFilePicker();
       setupAuth().then(() => loadTimeline()).catch((error) => {
         state.authRequired = true;
         updateAuthButton();

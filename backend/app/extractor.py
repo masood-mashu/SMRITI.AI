@@ -211,7 +211,7 @@ def get_extractor(*, use_fixture: bool) -> ReportExtractor:
     if os.getenv("EXTRACTION_PROVIDER", "stub").lower() in {"gemini", "ai_studio", "vertex"}:
         return VertexGeminiExtractor()
     raise ProviderConfigurationError(
-        "Real report extraction is not configured; set EXTRACTION_PROVIDER=vertex or use fixture mode in development"
+        "Real report extraction is not configured; set EXTRACTION_PROVIDER=gemini or vertex, or use fixture mode in development"
     )
 
 

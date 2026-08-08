@@ -6,9 +6,10 @@ from backend.app.extractor import (
     GeminiExtractorStub,
     ProviderConfigurationError,
     VertexGeminiExtractor,
+    get_extractor,
 )
 from backend.app.privacy import GemmaPiiScrubber, PrivacyPolicyError, RegexPiiScrubber, VertexGemmaPiiScrubber
-from backend.app.generation import GenerationError, VertexTextGenerator
+from backend.app.generation import GenerationError, VertexTextGenerator, get_vertex_generator
 from backend.app.config import validate_production_settings
 
 
@@ -27,6 +28,13 @@ def test_fixture_and_gemini_provider_contracts() -> None:
     assert len(fixture.facts) == 3
     assert gemini.provider == "gemini-stub"
     assert gemini.facts == []
+
+
+def test_gemini_provider_selection_is_server_side(monkeypatch) -> None:
+    monkeypatch.setenv("EXTRACTION_PROVIDER", "gemini")
+    monkeypatch.setenv("OUTPUT_PROVIDER", "gemini")
+    assert isinstance(get_extractor(use_fixture=False), VertexGeminiExtractor)
+    assert get_vertex_generator(model_env="DOCTOR_BRIEF_MODEL", default_model="test-model") is not None
 
 
 def test_gemma_scrubber_uses_safe_text_fallback() -> None:

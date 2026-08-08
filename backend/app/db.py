@@ -88,6 +88,11 @@ def init_db() -> None:
 def check_database() -> bool:
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
+    required_tables = {"patients", "reports", "ingestion_jobs", "health_facts", "contradictions"}
+    present_tables = set(inspect(engine).get_table_names())
+    missing_tables = sorted(required_tables - present_tables)
+    if missing_tables:
+        raise RuntimeError("Database schema is incomplete; missing tables: " + ", ".join(missing_tables))
     return True
 
 
