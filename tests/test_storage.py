@@ -49,6 +49,15 @@ def test_vercel_redirects_relative_local_storage_to_tmp(monkeypatch) -> None:
     assert storage.root == Path("/tmp/smriti-demo-uploads")
 
 
+def test_demo_redirects_relative_local_storage_to_tmp_without_vercel_flag(monkeypatch) -> None:
+    monkeypatch.delenv("VERCEL", raising=False)
+    monkeypatch.setenv("LOCAL_STORAGE_DIR", ".data/uploads")
+    monkeypatch.setenv("SMRITI_DEMO_MODE", "true")
+    storage = get_storage()
+    assert isinstance(storage, LocalFileStorage)
+    assert storage.root == Path("/tmp/smriti-demo-uploads")
+
+
 def test_production_storage_requires_encryption_key(monkeypatch) -> None:
     tmp_path = storage_root()
     monkeypatch.setenv("SMRITI_ENV", "production")

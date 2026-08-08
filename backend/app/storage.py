@@ -143,7 +143,10 @@ def get_storage() -> FileStorage:
         configured_root = os.getenv("LOCAL_STORAGE_DIR")
         # Vercel's deployment filesystem is read-only. Relative paths such as
         # .data/uploads must be redirected to its writable temporary volume.
-        if os.getenv("VERCEL", "").lower() in {"1", "true", "yes", "on"} and configured_root and not Path(configured_root).is_absolute():
+        running_on_vercel = os.getenv("VERCEL", "").lower() in {"1", "true", "yes", "on"}
+        normalized_root = configured_root.replace("\\", "/") if configured_root else ""
+        is_deployment_default = normalized_root in {".data/uploads", "./.data/uploads"}
+        if (running_on_vercel or (demo_mode and is_deployment_default)) and configured_root and not Path(configured_root).is_absolute():
             configured_root = "/tmp/smriti-demo-uploads"
         root = configured_root or ("/tmp/smriti-demo-uploads" if demo_mode else ".data/uploads")
         return LocalFileStorage(
